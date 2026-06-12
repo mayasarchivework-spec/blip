@@ -30,6 +30,7 @@ export interface User {
   id: string;
   username: string;
   displayName: string;
+  accountRole?: "user" | "admin" | "owner";
   bio: string;
   avatarUrl: string;
   avatarShape?: "circle" | "rounded" | "square";
@@ -57,6 +58,7 @@ export interface Post {
   type: PostType;
   content: string;
   imageUrl?: string;
+  imageUrls?: string[];
   videoUrl?: string;
   songTitle?: string;
   artistName?: string;

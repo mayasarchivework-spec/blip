@@ -12,6 +12,7 @@ export interface ProfileRow {
   id: string;
   username: string;
   display_name: string;
+  account_role: "user" | "admin" | "owner";
   bio: string | null;
   avatar_url: string | null;
   banner_url: string | null;
@@ -31,6 +32,7 @@ export interface PostRow {
   type: PostType;
   content: string;
   image_url: string | null;
+  image_urls: string[] | null;
   video_url: string | null;
   song_title: string | null;
   artist_name: string | null;
@@ -54,6 +56,7 @@ export interface CommentRow {
   profiles?: {
     username: string;
     display_name: string;
+    account_role?: "user" | "admin" | "owner";
     avatar_url: string | null;
   } | null;
 }

@@ -51,7 +51,7 @@ import {
   updateProfile,
   upsertProfile
 } from "@/lib/supabase/queries";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getConfiguredAccountRole, isSupabaseConfigured } from "@/lib/supabase/config";
 
 const defaultAdjustments: EditorAdjustments = {
   brightness: 15,
@@ -75,8 +75,10 @@ interface StoredAppState {
   allowExplore?: boolean;
   favoriteUserIds?: string[];
   requestedUserIds?: string[];
+  acceptedFriendIds?: string[];
   removedFriendIds?: string[];
   blipOverrides?: Record<string, number>;
+  postEditOverrides?: Record<string, Partial<Post>>;
   pinnedPostOverrides?: Record<string, boolean>;
   blippedPostIds?: string[];
   localPosts?: Post[];
@@ -139,9 +141,11 @@ interface AppStateValue {
     type: "photo" | "video" | "text";
     content: string;
     imageUrl?: string;
+    imageUrls?: string[];
     videoUrl?: string;
     caption?: string;
   }) => void;
+  editPost: (postId: string, updates: Partial<Post>) => void;
   createInstant: (instant: {
     type: "photo" | "video" | "text";
     content: string;
@@ -259,8 +263,19 @@ function stripPostMedia(post: Post): Post {
   return {
     ...post,
     imageUrl: isDataUrl(post.imageUrl) ? undefined : post.imageUrl,
+    imageUrls: post.imageUrls?.filter((url) => !isDataUrl(url)),
     videoUrl: isDataUrl(post.videoUrl) ? undefined : post.videoUrl,
     albumArtUrl: isDataUrl(post.albumArtUrl) ? undefined : post.albumArtUrl
+  };
+}
+
+function stripPostOverrideMedia(overrides: Partial<Post>) {
+  return {
+    ...overrides,
+    imageUrl: isDataUrl(overrides.imageUrl) ? undefined : overrides.imageUrl,
+    imageUrls: overrides.imageUrls?.filter((url) => !isDataUrl(url)),
+    videoUrl: isDataUrl(overrides.videoUrl) ? undefined : overrides.videoUrl,
+    albumArtUrl: isDataUrl(overrides.albumArtUrl) ? undefined : overrides.albumArtUrl
   };
 }
 
@@ -276,6 +291,14 @@ function compactStoredState(stored: StoredAppState): StoredAppState {
   return {
     ...stored,
     localPosts: stored.localPosts?.map(stripPostMedia),
+    postEditOverrides: stored.postEditOverrides
+      ? Object.fromEntries(
+          Object.entries(stored.postEditOverrides).map(([postId, overrides]) => [
+            postId,
+            stripPostOverrideMedia(overrides)
+          ])
+        )
+      : undefined,
     localInstants: stored.localInstants?.map(stripInstantMedia),
     profileOverrides: stripProfileMedia(stored.profileOverrides),
     savedStickers: stored.savedStickers?.filter((sticker) => !isDataUrl(sticker))
@@ -314,6 +337,7 @@ async function ensureProfileForSession(
     id: session.user.id,
     username,
     display_name: displayName,
+    account_role: getConfiguredAccountRole(session.user.email, username),
     bio: "",
     avatar_url: "/assets/avatar-racer.svg",
     accent_color: "blue" as const,
@@ -321,19 +345,46 @@ async function ensureProfileForSession(
     allow_explore: true,
     profile_line: ""
   };
+  const profileWithoutRole = {
+    id: profile.id,
+    username: profile.username,
+    display_name: profile.display_name,
+    bio: profile.bio,
+    avatar_url: profile.avatar_url,
+    accent_color: profile.accent_color,
+    is_private: profile.is_private,
+    allow_explore: profile.allow_explore,
+    profile_line: profile.profile_line
+  };
 
   try {
     return (await upsertProfile(profile, session.access_token))[0];
   } catch {
-    return (
-      await upsertProfile(
-        {
-          ...profile,
-          username: usernameWithSuffix(username, session.user.id)
-        },
-        session.access_token
-      )
-    )[0];
+    try {
+      return (
+        await upsertProfile(
+          {
+            ...profile,
+            username: usernameWithSuffix(username, session.user.id)
+          },
+          session.access_token
+        )
+      )[0];
+    } catch {
+      try {
+        return (await upsertProfile(profileWithoutRole, session.access_token))[0];
+      } catch {
+        return (
+          await upsertProfile(
+            {
+              ...profileWithoutRole,
+              username: usernameWithSuffix(username, session.user.id)
+            },
+            session.access_token
+          )
+        )[0];
+      }
+    }
   }
 }
 
@@ -359,9 +410,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [allowExplore, setAllowExplore] = useState(mockCurrentUser.allowExplore);
   const [favoriteUserIds, setFavoriteUserIds] = useState<string[]>([]);
   const [requestedUserIds, setRequestedUserIds] = useState<string[]>([]);
+  const [acceptedFriendIds, setAcceptedFriendIds] = useState<string[]>([]);
   const [removedFriendIds, setRemovedFriendIds] = useState<string[]>([]);
   const [hiddenRequestIds, setHiddenRequestIds] = useState<string[]>([]);
   const [blipOverrides, setBlipOverrides] = useState<Record<string, number>>({});
+  const [postEditOverrides, setPostEditOverrides] = useState<Record<string, Partial<Post>>>(
+    {}
+  );
   const [commentOverrides, setCommentOverrides] = useState<Record<string, number>>({});
   const [pinnedPostOverrides, setPinnedPostOverrides] = useState<Record<string, boolean>>(
     {}
@@ -503,11 +558,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (Array.isArray(stored.requestedUserIds)) {
         setRequestedUserIds(stored.requestedUserIds);
       }
+      if (Array.isArray(stored.acceptedFriendIds)) {
+        setAcceptedFriendIds(stored.acceptedFriendIds);
+      }
       if (Array.isArray(stored.removedFriendIds)) {
         setRemovedFriendIds(stored.removedFriendIds);
       }
       if (stored.blipOverrides && typeof stored.blipOverrides === "object") {
         setBlipOverrides(stored.blipOverrides);
+      }
+      if (stored.postEditOverrides && typeof stored.postEditOverrides === "object") {
+        setPostEditOverrides(stored.postEditOverrides);
       }
       if (stored.pinnedPostOverrides && typeof stored.pinnedPostOverrides === "object") {
         setPinnedPostOverrides(stored.pinnedPostOverrides);
@@ -585,8 +646,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       allowExplore,
       favoriteUserIds,
       requestedUserIds,
+      acceptedFriendIds,
       removedFriendIds,
       blipOverrides,
+      postEditOverrides,
       pinnedPostOverrides,
       blippedPostIds,
       localPosts,
@@ -604,6 +667,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     persistStoredState(stored);
   }, [
     accentName,
+    acceptedFriendIds,
     allowExplore,
     blipOverrides,
     blippedPostIds,
@@ -614,6 +678,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     localInstants,
     localThreads,
     localPosts,
+    postEditOverrides,
     pinnedPostOverrides,
     profileOverrides,
     requestedUserIds,
@@ -638,11 +703,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       createdAt: "Now",
       status: "pending" as const
     }));
-    const visibleFriendIds = baseCurrentUser.friendIds.filter(
+    const baseVisibleFriendIds = baseCurrentUser.friendIds.filter(
       (friendId) => !removedFriendIds.includes(friendId)
     );
+    const acceptedVisibleFriendIds = acceptedFriendIds.filter(
+      (friendId) =>
+        friendId !== baseCurrentUser.id &&
+        !removedFriendIds.includes(friendId) &&
+        !baseVisibleFriendIds.includes(friendId)
+    );
+    const visibleFriendIds = [...baseVisibleFriendIds, ...acceptedVisibleFriendIds];
     const removedVisibleFriendCount =
-      baseCurrentUser.friendIds.length - visibleFriendIds.length;
+      baseCurrentUser.friendIds.length - baseVisibleFriendIds.length;
     const profileStats = profileOverrides.stats ?? baseCurrentUser.stats;
 
     return {
@@ -654,7 +726,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       friendIds: visibleFriendIds,
       stats: {
         ...profileStats,
-        friends: Math.max(0, profileStats.friends - removedVisibleFriendCount)
+        friends: Math.max(
+          visibleFriendIds.length,
+          profileStats.friends - removedVisibleFriendCount + acceptedVisibleFriendIds.length
+        )
       },
       note:
         activeUserNote ||
@@ -671,6 +746,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     };
   }, [
     accentName,
+    acceptedFriendIds,
     activeUserNote,
     allowExplore,
     baseCurrentUser,
@@ -706,6 +782,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         .filter((post) => post.type !== "song" && !hiddenPostIds.includes(post.id))
         .map((post) => ({
           ...post,
+          ...postEditOverrides[post.id],
           blips: blipOverrides[post.id] ?? post.blips,
           comments: commentOverrides[post.id] ?? post.comments,
           isPinned: pinnedPostOverrides[post.id] ?? post.isPinned
@@ -717,6 +794,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       hiddenPostIds,
       isGuest,
       localPosts,
+      postEditOverrides,
       pinnedPostOverrides
     ]
   );
@@ -912,11 +990,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const removeFriend = useCallback((userId: string) => {
     setRemovedFriendIds((ids) => (ids.includes(userId) ? ids : [...ids, userId]));
     setRequestedUserIds((ids) => ids.filter((id) => id !== userId));
+    setAcceptedFriendIds((ids) => ids.filter((id) => id !== userId));
   }, []);
 
   const answerFriendRequest = useCallback(
     (requestId: string, status: "accepted" | "ignored") => {
+      const request = currentUser.friendRequestsReceived.find(
+        (item) => item.id === requestId || item.fromUserId === requestId
+      );
+      const fromUserId = request?.fromUserId;
+
       setHiddenRequestIds((ids) => (ids.includes(requestId) ? ids : [...ids, requestId]));
+
+      if (status === "accepted" && fromUserId) {
+        setAcceptedFriendIds((ids) => (ids.includes(fromUserId) ? ids : [...ids, fromUserId]));
+        setRemovedFriendIds((ids) => ids.filter((id) => id !== fromUserId));
+      }
 
       if (!isRemoteId(requestId)) {
         return;
@@ -928,7 +1017,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         authSession?.access_token
       ).catch(() => undefined);
     },
-    [authSession?.access_token]
+    [authSession?.access_token, currentUser.friendRequestsReceived]
   );
 
   const hasRequested = useCallback(
@@ -1225,15 +1314,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       type: "photo" | "video" | "text";
       content: string;
       imageUrl?: string;
+      imageUrls?: string[];
       videoUrl?: string;
       caption?: string;
     }) => {
+      const imageUrls = (post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [])
+        .filter(Boolean)
+        .slice(0, 20);
       const newPost: Post = {
         id: `local-post-${Date.now()}`,
         userId: currentUser.id,
         type: post.type,
         content: post.content,
-        imageUrl: post.imageUrl,
+        imageUrl: imageUrls[0] ?? post.imageUrl,
+        imageUrls: imageUrls.length > 1 ? imageUrls : undefined,
         videoUrl: post.videoUrl,
         caption: post.caption,
         blips: 0,
@@ -1254,7 +1348,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           user_id: currentUser.id,
           type: post.type,
           content: post.content,
-          image_url: post.imageUrl ?? null,
+          image_url: imageUrls[0] ?? post.imageUrl ?? null,
+          image_urls: imageUrls,
           video_url: post.videoUrl ?? null,
           caption: post.caption ?? null,
           aspect_ratio: post.type === "text" ? "square" : "free",
@@ -1265,6 +1360,46 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       ).catch(() => undefined);
     },
     [allowExplore, authSession?.access_token, currentUser.id]
+  );
+
+  const editPost = useCallback(
+    (postId: string, updates: Partial<Post>) => {
+      const imageUrls = updates.imageUrls?.filter(Boolean).slice(0, 20);
+      const normalizedUpdates: Partial<Post> = {
+        ...updates,
+        imageUrls: imageUrls && imageUrls.length > 1 ? imageUrls : undefined,
+        imageUrl: imageUrls?.[0] ?? updates.imageUrl
+      };
+
+      setLocalPosts((items) =>
+        items.map((post) =>
+          post.id === postId ? { ...post, ...normalizedUpdates } : post
+        )
+      );
+      setPostEditOverrides((values) => ({
+        ...values,
+        [postId]: {
+          ...(values[postId] ?? {}),
+          ...normalizedUpdates
+        }
+      }));
+
+      if (!isRemoteId(postId)) {
+        return;
+      }
+
+      void updateRemotePost(
+        postId,
+        {
+          caption: normalizedUpdates.caption,
+          content: normalizedUpdates.content,
+          image_url: normalizedUpdates.imageUrl ?? null,
+          image_urls: imageUrls ?? []
+        },
+        authSession?.access_token
+      ).catch(() => undefined);
+    },
+    [authSession?.access_token]
   );
 
   const createInstant = useCallback(
@@ -1495,6 +1630,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signOut,
       addLocalPost,
+      editPost,
       createInstant,
       deletePost,
       hidePost,
@@ -1544,6 +1680,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       dataset.source,
       createInstant,
       deletePost,
+      editPost,
       editorAdjustments,
       editorFilter,
       effectiveUser,

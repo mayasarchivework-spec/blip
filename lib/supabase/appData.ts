@@ -137,6 +137,7 @@ export function buildAppDataset(
       id: profile.id,
       username,
       displayName,
+      accountRole: profile.account_role ?? "user",
       bio: cleanProfileText(profile.bio, ""),
       avatarUrl: profile.avatar_url ?? "/assets/avatar-racer.svg",
       bannerUrl: profile.banner_url ?? undefined,
@@ -257,12 +258,15 @@ function addFriendRequest(users: User[], request: FriendRequest) {
 }
 
 function mapPostRow(row: PostRow): Post {
+  const imageUrls = normalizedImageUrls(row.image_urls, row.image_url);
+
   return {
     id: row.id,
     userId: row.user_id,
     type: row.type,
     content: row.content,
-    imageUrl: row.image_url ?? undefined,
+    imageUrl: imageUrls[0] ?? row.image_url ?? undefined,
+    imageUrls: imageUrls.length > 1 ? imageUrls : undefined,
     videoUrl: row.video_url ?? undefined,
     songTitle: row.song_title ?? undefined,
     artistName: row.artist_name ?? undefined,
@@ -291,11 +295,15 @@ function isRenderablePostRow(row: PostRow) {
   }
 
   if (row.type === "photo") {
-    return hasMeaningfulText(row.image_url);
+    return hasMeaningfulText(row.image_url) || normalizedImageUrls(row.image_urls).length > 0;
   }
 
   if (row.type === "video") {
-    return hasMeaningfulText(row.video_url) || hasMeaningfulText(row.image_url);
+    return (
+      hasMeaningfulText(row.video_url) ||
+      hasMeaningfulText(row.image_url) ||
+      normalizedImageUrls(row.image_urls).length > 0
+    );
   }
 
   if (row.type === "song") {
@@ -307,6 +315,16 @@ function isRenderablePostRow(row: PostRow) {
   }
 
   return false;
+}
+
+function normalizedImageUrls(imageUrls?: string[] | null, fallback?: string | null) {
+  const values = Array.isArray(imageUrls) ? imageUrls : [];
+  const cleanValues = values
+    .concat(fallback ? [fallback] : [])
+    .map((value) => normalizedText(value))
+    .filter(hasMeaningfulText);
+
+  return Array.from(new Set(cleanValues)).slice(0, 20);
 }
 
 function mapInstantRow(row: InstantRow): Instant {

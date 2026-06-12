@@ -1,3 +1,5 @@
+import { RichText } from "@/components/RichText";
+
 export function TextPost({
   content,
   compact = false
@@ -7,8 +9,10 @@ export function TextPost({
 }) {
   return (
     <div className={compact ? "text-post text-post-compact" : "text-post"}>
-      <pre>{content}</pre>
-      <span className="text-post-heart">♡</span>
+      <p className="text-post-copy">
+        <RichText text={content} />
+      </p>
+      <span className="text-post-footer">posted from Blip text</span>
     </div>
   );
 }

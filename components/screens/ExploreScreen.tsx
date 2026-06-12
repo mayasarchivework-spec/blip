@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
 import { PostGrid } from "@/components/PostGrid";
+import { VerifiedName } from "@/components/VerifiedName";
 import { useAppState } from "@/state/AppState";
 
 const categories = ["For you", "People", "Posts", "Tags"];
@@ -20,6 +22,10 @@ const filterLabels: Record<ExploreFilter, string> = {
   under1000: "under 1000 friends"
 };
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function isRecentPost(createdAt: string) {
   if (/m|h|Yesterday/i.test(createdAt)) {
     return true;
@@ -29,7 +35,17 @@ function isRecentPost(createdAt: string) {
   return dayMatch ? Number(dayMatch[1]) <= 7 : true;
 }
 
+function hasTag(post: { caption?: string; content: string }, tag: string) {
+  if (!tag) {
+    return true;
+  }
+
+  const text = `${post.caption ?? ""} ${post.content}`.toLowerCase();
+  return new RegExp(`(^|\\s)#${escapeRegExp(tag)}(\\b|$)`).test(text);
+}
+
 export function ExploreScreen() {
+  const searchParams = useSearchParams();
   const {
     canInteractWith,
     currentUser,
@@ -44,6 +60,7 @@ export function ExploreScreen() {
   } = useAppState();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<ExploreFilter[]>([]);
+  const activeTag = (searchParams.get("tag") ?? "").trim().replace(/^#+/, "").toLowerCase();
 
   const suggestedUsers = users.filter(
     (user) => user.id !== currentUser.id && !isFriend(user.id)
@@ -58,6 +75,10 @@ export function ExploreScreen() {
     const effectiveOwner = effectiveUser(owner);
     const visible = effectiveOwner.allowExplore && (!effectiveOwner.isPrivate || isFriend(owner.id));
     if (!visible) {
+      return false;
+    }
+
+    if (!hasTag(post, activeTag)) {
       return false;
     }
 
@@ -120,11 +141,21 @@ export function ExploreScreen() {
         ) : null}
         <div className="category-pills">
           {categories.map((category, index) => (
-            <button key={category} type="button" className={index === 0 ? "active" : ""}>
+            <button
+              key={category}
+              type="button"
+              className={activeTag ? (category === "Tags" ? "active" : "") : index === 0 ? "active" : ""}
+            >
               {category}
             </button>
           ))}
         </div>
+        {activeTag ? (
+          <div className="tag-filter-chip">
+            <span>Showing #{activeTag}</span>
+            <Link href="/explore">Clear</Link>
+          </div>
+        ) : null}
         <p className="privacy-notice">
           {isGuest
             ? "Browse public Blips. Sign up or sign in to add friends, blip, comment, or share."
@@ -144,7 +175,9 @@ export function ExploreScreen() {
                 <div key={user.id} className="suggested-person">
                   <Link href={`/profile/${user.username}`}>
                     <AvatarRing user={user} size="lg" />
-                    <strong>{user.displayName}</strong>
+                    <strong>
+                      <VerifiedName user={user} />
+                    </strong>
                     <span>@{user.username}</span>
                   </Link>
                   <BlipButton
@@ -170,8 +203,12 @@ export function ExploreScreen() {
         />
       ) : (
         <section className="empty-state">
-          <h2>No public posts yet.</h2>
-          <p>Explore will fill up as people share public Blips.</p>
+          <h2>{activeTag ? `No posts tagged #${activeTag} yet.` : "No public posts yet."}</h2>
+          <p>
+            {activeTag
+              ? "Try another tag or clear the filter."
+              : "Explore will fill up as people share public Blips."}
+          </p>
         </section>
       )}
     </div>

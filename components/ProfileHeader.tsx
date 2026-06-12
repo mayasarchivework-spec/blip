@@ -17,6 +17,8 @@ import {
 import { useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
+import { RichText } from "@/components/RichText";
+import { VerifiedName } from "@/components/VerifiedName";
 import type { User } from "@/data/types";
 import { copyToClipboard } from "@/lib/copyToClipboard";
 import { useAppState } from "@/state/AppState";
@@ -107,7 +109,7 @@ export function ProfileHeader({
   ) {
     const limits =
       key === "bannerUrl"
-        ? { width: 1080, height: 1920, quality: 0.82, mode: "cover" as const }
+        ? { width: 1920, height: 1080, quality: 0.82, mode: "cover" as const }
         : { maxWidth: 520, maxHeight: 520, quality: 0.82, mode: "contain" as const };
     const reader = new FileReader();
 
@@ -195,7 +197,9 @@ export function ProfileHeader({
         <AvatarRing user={user} size="xl" onClick={() => openInstant(user.id)} />
         <div className="profile-copy">
           <div className="profile-name-row">
-            <h2>{user.displayName}</h2>
+            <h2>
+              <VerifiedName user={user} />
+            </h2>
             {isOwnerProfile ? (
               <Link href="/settings" className="gear-link" aria-label="Open settings">
                 <Settings size={28} />
@@ -205,8 +209,14 @@ export function ProfileHeader({
           <Link href={`/profile/${user.username}`} className="handle">
             @{user.username}
           </Link>
-          <p>{user.bio}</p>
-          {user.profileLine ? <p className="profile-line">{user.profileLine}</p> : null}
+          <p>
+            <RichText text={user.bio} />
+          </p>
+          {user.profileLine ? (
+            <p className="profile-line">
+              <RichText text={user.profileLine} />
+            </p>
+          ) : null}
         </div>
         {isOwnerProfile ? (
           <div className="theme-chip">
@@ -248,12 +258,17 @@ export function ProfileHeader({
             </BlipButton>
           </>
         ) : isFriendProfile ? (
-          <Link
-            href={messageThread ? `/messages/${messageThread.id}` : "/messages"}
-            className="blip-link-button"
-          >
-            Send message
-          </Link>
+          <>
+            <BlipButton type="button" wide variant="secondary" disabled>
+              Friends
+            </BlipButton>
+            <Link
+              href={messageThread ? `/messages/${messageThread.id}` : "/messages"}
+              className="blip-link-button"
+            >
+              Send message
+            </Link>
+          </>
         ) : (
           <BlipButton
             type="button"
@@ -317,7 +332,9 @@ export function ProfileHeader({
                           >
                             <AvatarRing user={friend} size="sm" showInstant={false} />
                             <span>
-                              <strong>{friend.displayName}</strong>
+                              <strong>
+                                <VerifiedName user={friend} />
+                              </strong>
                               <small>@{friend.username}</small>
                             </span>
                           </Link>
@@ -354,7 +371,9 @@ export function ProfileHeader({
                       <div className="profile-blip-row" key={post.id}>
                         {post.imageUrl ? <img src={post.imageUrl} alt="" /> : <span>{post.type}</span>}
                         <div>
-                          <strong>{post.content}</strong>
+                          <strong>
+                            <RichText text={post.caption ?? post.content} />
+                          </strong>
                           <small>{post.createdAt}</small>
                         </div>
                         <em>{post.blips}</em>
@@ -394,9 +413,13 @@ export function ProfileHeader({
                   showInstant={false}
                 />
                 <div>
-                  <strong>{form.displayName || user.displayName}</strong>
+                  <strong>
+                    <VerifiedName user={{ ...user, displayName: form.displayName || user.displayName }} />
+                  </strong>
                   <span>@{form.username || user.username}</span>
-                  <p>{form.bio || user.bio}</p>
+                  <p>
+                    <RichText text={form.bio || user.bio} />
+                  </p>
                 </div>
               </div>
             </div>
@@ -455,6 +478,7 @@ export function ProfileHeader({
                 <span>Bio</span>
                 <textarea
                   value={form.bio}
+                  placeholder="add a bio... tag @friends and use #hashtags"
                   onChange={(event) =>
                     setForm((values) => ({ ...values, bio: event.target.value }))
                   }

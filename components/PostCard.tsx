@@ -7,6 +7,7 @@ import {
   Edit3,
   EyeOff,
   Flag,
+  ImagePlus,
   Mail,
   MessageCircle,
   MessageSquare,
@@ -21,9 +22,36 @@ import { useEffect, useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipReactionButton } from "@/components/BlipReactionButton";
 import { PostContent } from "@/components/PostContent";
+import { RichText } from "@/components/RichText";
+import { VerifiedName } from "@/components/VerifiedName";
 import type { Post } from "@/data/types";
 import { copyToClipboard } from "@/lib/copyToClipboard";
 import { useAppState } from "@/state/AppState";
+
+const hashtagPattern = /(^|\s)(#[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*)/g;
+
+function formatHashtags(value: string) {
+  return value
+    .split(/[\s,]+/)
+    .map((tag) => tag.trim().replace(/^#+/, ""))
+    .filter(Boolean)
+    .map((tag) => `#${tag}`)
+    .join(" ");
+}
+
+function splitCaption(value: string | undefined) {
+  const text = value ?? "";
+  const hashtags = Array.from(text.matchAll(hashtagPattern))
+    .map((match) => match[2])
+    .join(" ");
+  const caption = text.replace(hashtagPattern, " ").replace(/\s+/g, " ").trim();
+
+  return { caption, hashtags };
+}
+
+function buildCaption(caption: string, hashtags: string) {
+  return [caption.trim(), formatHashtags(hashtags)].filter(Boolean).join(" ");
+}
 
 interface PostCardProps {
   post: Post;
@@ -40,6 +68,7 @@ export function PostCard({
     addPostComment,
     blipPost,
     deletePost,
+    editPost,
     getCommentsForPost,
     getUserById,
     hasBlipped,
@@ -52,6 +81,10 @@ export function PostCard({
   const [expanded, setExpanded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editCaption, setEditCaption] = useState("");
+  const [editHashtags, setEditHashtags] = useState("");
+  const [editImages, setEditImages] = useState<string[]>([]);
   const [draftComment, setDraftComment] = useState("");
   const [menuMessage, setMenuMessage] = useState("");
   const user = getUserById(post.userId);
@@ -98,6 +131,57 @@ export function PostCard({
     setDraftComment("");
   }
 
+  function openEditModal() {
+    const { caption, hashtags } = splitCaption(post.caption);
+    const images = (post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [])
+      .filter(Boolean)
+      .slice(0, 20);
+
+    setEditCaption(caption);
+    setEditHashtags(hashtags);
+    setEditImages(images);
+    setMoreOpen(false);
+    setEditOpen(true);
+  }
+
+  function chooseEditImages(fileList: FileList | null) {
+    const slots = Math.max(0, 20 - editImages.length);
+    const files = Array.from(fileList ?? []).slice(0, slots);
+
+    if (!files.length) {
+      return;
+    }
+
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+            reader.onerror = () => resolve("");
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then((urls) => {
+      setEditImages((images) => [...images, ...urls.filter(Boolean)].slice(0, 20));
+    });
+  }
+
+  function savePostEdits() {
+    const finalCaption = buildCaption(editCaption, editHashtags);
+    const images = editImages.filter(Boolean).slice(0, 20);
+
+    editPost(post.id, {
+      caption: finalCaption || undefined,
+      content: post.type === "text" ? editCaption.trim() || post.content : finalCaption || post.content,
+      imageUrl: images[0],
+      imageUrls: images.length > 1 ? images : undefined
+    });
+    setEditOpen(false);
+    setMenuMessage("post updated");
+    window.setTimeout(() => setMenuMessage(""), 1200);
+  }
+
   async function copyShareLink(message = "link copied") {
     const copied = await copyToClipboard(shareUrl);
     setMenuMessage(copied ? message : "select and copy this link");
@@ -123,8 +207,12 @@ export function PostCard({
                 <div className="comment-row" key={comment.id}>
                   <AvatarRing user={author} size="sm" showInstant={false} />
                   <p>
-                    <strong>{comment.authorName ?? author.displayName}</strong>{" "}
-                    {comment.body}
+                    <strong>
+                      <VerifiedName user={author}>
+                        {comment.authorName ?? author.displayName}
+                      </VerifiedName>
+                    </strong>{" "}
+                    <RichText text={comment.body} />
                   </p>
                 </div>
               );
@@ -133,8 +221,12 @@ export function PostCard({
               <div className="comment-row" key={`${post.id}-comment-${index}`}>
                 <AvatarRing user={postUser} size="sm" showInstant={false} />
                 <p>
-                  <strong>{index === 0 ? postUser.displayName : "friend"}</strong>{" "}
-                  {comment}
+                  <strong>
+                    <VerifiedName user={postUser}>
+                      {index === 0 ? postUser.displayName : "friend"}
+                    </VerifiedName>
+                  </strong>{" "}
+                  <RichText text={comment} />
                 </p>
               </div>
             ))}
@@ -151,7 +243,9 @@ export function PostCard({
         <Link href={`/profile/${user.username}`} className="post-author">
           <AvatarRing user={user} size="sm" />
           <div>
-            <strong>{user.displayName}</strong>
+            <strong>
+              <VerifiedName user={user} />
+            </strong>
             <span>{post.createdAt}</span>
           </div>
         </Link>
@@ -174,7 +268,11 @@ export function PostCard({
       >
         <PostContent post={post} />
       </div>
-      {post.caption ? <p className="post-caption">{post.caption}</p> : null}
+      {post.caption ? (
+        <p className="post-caption">
+          <RichText text={post.caption} />
+        </p>
+      ) : null}
       <div className="post-actions">
         <BlipReactionButton
           active={blipped}
@@ -234,10 +332,10 @@ export function PostCard({
         <div className="post-popover post-menu">
           {ownPost ? (
             <>
-              <Link href="/editor">
+              <button type="button" onClick={openEditModal}>
                 <Edit3 size={17} />
                 <span>Edit</span>
-              </Link>
+              </button>
               <button type="button" onClick={() => pinPost(post.id)}>
                 <Pin size={17} />
                 <span>{post.isPinned ? "Unpin" : "Pin photo"}</span>
@@ -264,6 +362,76 @@ export function PostCard({
             </>
           )}
           {menuMessage ? <p>{menuMessage}</p> : null}
+        </div>
+      ) : null}
+      {editOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="post-edit-modal">
+            <button
+              className="modal-close"
+              type="button"
+              onClick={() => setEditOpen(false)}
+              aria-label="Close edit post"
+            >
+              <X size={22} />
+            </button>
+            <h2>Edit post</h2>
+            <label className="composer-field">
+              <span>Caption</span>
+              <textarea
+                value={editCaption}
+                maxLength={500}
+                onChange={(event) => setEditCaption(event.target.value)}
+                placeholder="update the caption..."
+              />
+            </label>
+            <label className="composer-field">
+              <span>Hashtags</span>
+              <input
+                value={editHashtags}
+                onChange={(event) => setEditHashtags(event.target.value)}
+                placeholder="#night #blip"
+              />
+            </label>
+            <div className="post-edit-image-head">
+              <strong>Images</strong>
+              <span>{editImages.length}/20</span>
+            </div>
+            <div className="post-image-editor-grid">
+              {editImages.map((imageUrl, index) => (
+                <button
+                  key={`${imageUrl}-${index}`}
+                  type="button"
+                  onClick={() =>
+                    setEditImages((images) =>
+                      images.filter((_, itemIndex) => itemIndex !== index)
+                    )
+                  }
+                  aria-label="Remove image"
+                >
+                  <img src={imageUrl} alt="" />
+                  <span>Remove</span>
+                </button>
+              ))}
+              {editImages.length < 20 ? (
+                <label className="post-image-add-button">
+                  <ImagePlus size={22} />
+                  <span>Add images</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(event) => chooseEditImages(event.target.files)}
+                  />
+                </label>
+              ) : null}
+            </div>
+            <div className="editor-action-row">
+              <BlipButton type="button" onClick={savePostEdits} wide>
+                Save changes
+              </BlipButton>
+            </div>
+          </div>
         </div>
       ) : null}
       {!canInteract ? (
@@ -305,12 +473,18 @@ export function PostCard({
             <div className="expanded-post-head">
               <AvatarRing user={user} size="sm" />
               <div>
-                <strong>{user.displayName}</strong>
+                <strong>
+                  <VerifiedName user={user} />
+                </strong>
                 <span>{post.createdAt}</span>
               </div>
             </div>
             <PostContent post={post} />
-            {post.caption ? <p className="post-caption">{post.caption}</p> : null}
+            {post.caption ? (
+              <p className="post-caption">
+                <RichText text={post.caption} />
+              </p>
+            ) : null}
             <div className="expanded-post-comments">
               <strong>Comments</strong>
               {renderComments()}

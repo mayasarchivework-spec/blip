@@ -6,6 +6,7 @@ import { useState } from "react";
 import { BlipReactionButton } from "@/components/BlipReactionButton";
 import { PostCard } from "@/components/PostCard";
 import { PostContent } from "@/components/PostContent";
+import { VerifiedName } from "@/components/VerifiedName";
 import type { Post } from "@/data/types";
 import { useAppState } from "@/state/AppState";
 
@@ -99,7 +100,9 @@ export function PostGrid({
             </button>
             {getUserById(expandedPost.userId) ? (
               <div className="expanded-post-head">
-                <strong>{getUserById(expandedPost.userId)?.displayName}</strong>
+                <strong>
+                  <VerifiedName user={getUserById(expandedPost.userId)!} />
+                </strong>
                 <span>{expandedPost.createdAt}</span>
               </div>
             ) : null}

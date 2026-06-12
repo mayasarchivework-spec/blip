@@ -19,6 +19,7 @@ import {
 import { useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
+import { VerifiedName } from "@/components/VerifiedName";
 import { useAppState } from "@/state/AppState";
 
 export function ChatScreen({ threadId }: { threadId: string }) {
@@ -67,7 +68,9 @@ export function ChatScreen({ threadId }: { threadId: string }) {
         </Link>
         <AvatarRing user={otherUser} size="sm" onClick={() => openInstant(otherUser.id)} />
         <div className="chat-title">
-          <strong>{otherUser.displayName}</strong>
+          <strong>
+            <VerifiedName user={otherUser} />
+          </strong>
           <span>@{otherUser.username}</span>
         </div>
         <button

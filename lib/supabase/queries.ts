@@ -30,8 +30,17 @@ type ProfileUpdate = Partial<
 
 type ProfileInsert = Pick<
   ProfileRow,
-  "id" | "username" | "display_name" | "bio" | "avatar_url" | "accent_color" | "is_private" | "allow_explore" | "profile_line"
->;
+  | "id"
+  | "username"
+  | "display_name"
+  | "bio"
+  | "avatar_url"
+  | "accent_color"
+  | "is_private"
+  | "allow_explore"
+  | "profile_line"
+> &
+  Partial<Pick<ProfileRow, "account_role">>;
 
 type PostInsert = Pick<
   PostRow,
@@ -39,6 +48,7 @@ type PostInsert = Pick<
   | "type"
   | "content"
   | "image_url"
+  | "image_urls"
   | "video_url"
   | "caption"
   | "aspect_ratio"
@@ -46,7 +56,12 @@ type PostInsert = Pick<
   | "visibility"
 >;
 
-type PostUpdate = Partial<Pick<PostRow, "caption" | "content" | "is_pinned" | "visibility">>;
+type PostUpdate = Partial<
+  Pick<
+    PostRow,
+    "caption" | "content" | "image_url" | "image_urls" | "is_pinned" | "visibility"
+  >
+>;
 
 type InstantInsert = Pick<
   InstantRow,
@@ -86,7 +101,7 @@ export function fetchExplorePosts(accessToken?: string | null) {
   return supabaseFetch<PostRow[]>("posts", {
     accessToken,
     query: {
-      select: "*,profiles(username,display_name,avatar_url,accent_color)",
+      select: "*,profiles(username,display_name,account_role,avatar_url,accent_color)",
       visibility: "eq.public",
       order: "created_at.desc"
     }
@@ -179,7 +194,7 @@ export function fetchPostComments(postId: string, accessToken?: string | null) {
   return supabaseFetch<CommentRow[]>("post_comments", {
     accessToken,
     query: {
-      select: "*,profiles(username,display_name,avatar_url)",
+      select: "*,profiles(username,display_name,account_role,avatar_url)",
       post_id: `eq.${postId}`,
       order: "created_at.asc"
     }

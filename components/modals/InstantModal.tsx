@@ -5,6 +5,8 @@ import { Send, X } from "lucide-react";
 import { useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
+import { RichText } from "@/components/RichText";
+import { VerifiedName } from "@/components/VerifiedName";
 import { useAppState } from "@/state/AppState";
 
 export function InstantModal() {
@@ -57,7 +59,9 @@ export function InstantModal() {
         <div className="instant-top">
           <AvatarRing user={user} size="sm" />
           <div>
-            <strong>{user.displayName}</strong>
+            <strong>
+              <VerifiedName user={user} />
+            </strong>
             <span>{instant.expiresAt}</span>
           </div>
         </div>
@@ -76,7 +80,9 @@ export function InstantModal() {
             <img src={instant.thumbnailUrl} alt="" />
           ) : null}
           <div className="instant-caption">
-            <p>{instant.content}</p>
+            <p>
+              <RichText text={instant.content} />
+            </p>
           </div>
         </div>
         <form

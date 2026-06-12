@@ -30,6 +30,7 @@ export const mockUsers: User[] = [
     id: currentUserId,
     username: "racer",
     displayName: "racer",
+    accountRole: "owner",
     bio: "just here for the good times",
     avatarUrl: "/assets/avatar-racer.svg",
     accentColor: "blue",

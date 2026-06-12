@@ -49,6 +49,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text not null unique check (username ~ '^[a-z0-9._]{2,30}$'),
   display_name text not null,
+  account_role text not null default 'user' check (account_role in ('user', 'admin', 'owner')),
   bio text default '',
   avatar_url text,
   banner_url text,
@@ -91,6 +92,7 @@ create table if not exists public.posts (
   type public.post_type not null,
   content text not null default '',
   image_url text,
+  image_urls jsonb not null default '[]'::jsonb,
   video_url text,
   song_title text,
   artist_name text,
@@ -186,6 +188,7 @@ create table if not exists public.messages (
 -- they have the columns the rest of this schema expects.
 alter table public.profiles add column if not exists username text;
 alter table public.profiles add column if not exists display_name text;
+alter table public.profiles add column if not exists account_role text not null default 'user';
 alter table public.profiles add column if not exists bio text default '';
 alter table public.profiles add column if not exists avatar_url text;
 alter table public.profiles add column if not exists banner_url text;
@@ -197,6 +200,11 @@ alter table public.profiles add column if not exists note text;
 alter table public.profiles add column if not exists note_expires_at timestamptz;
 alter table public.profiles add column if not exists created_at timestamptz not null default now();
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
+
+alter table public.profiles drop constraint if exists profiles_account_role_check;
+alter table public.profiles
+  add constraint profiles_account_role_check
+  check (account_role in ('user', 'admin', 'owner'));
 
 alter table public.friend_requests add column if not exists from_user_id uuid references public.profiles(id) on delete cascade;
 alter table public.friend_requests add column if not exists to_user_id uuid references public.profiles(id) on delete cascade;
@@ -212,6 +220,7 @@ alter table public.posts add column if not exists user_id uuid references public
 alter table public.posts add column if not exists type public.post_type not null default 'text';
 alter table public.posts add column if not exists content text not null default '';
 alter table public.posts add column if not exists image_url text;
+alter table public.posts add column if not exists image_urls jsonb not null default '[]'::jsonb;
 alter table public.posts add column if not exists video_url text;
 alter table public.posts add column if not exists song_title text;
 alter table public.posts add column if not exists artist_name text;
@@ -224,6 +233,14 @@ alter table public.posts add column if not exists blips_count integer not null d
 alter table public.posts add column if not exists comments_count integer not null default 0;
 alter table public.posts add column if not exists created_at timestamptz not null default now();
 alter table public.posts add column if not exists updated_at timestamptz not null default now();
+
+alter table public.posts drop constraint if exists posts_image_urls_array_check;
+alter table public.posts
+  add constraint posts_image_urls_array_check
+  check (
+    jsonb_typeof(image_urls) = 'array'
+    and jsonb_array_length(image_urls) <= 20
+  );
 
 alter table public.post_blips add column if not exists post_id uuid references public.posts(id) on delete cascade;
 alter table public.post_blips add column if not exists user_id uuid references public.profiles(id) on delete cascade;

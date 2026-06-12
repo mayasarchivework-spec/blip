@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AvatarRing } from "@/components/AvatarRing";
 import { InstantRow } from "@/components/InstantRow";
+import { VerifiedName } from "@/components/VerifiedName";
 import { useAppState } from "@/state/AppState";
 
 type MessagePanel = "requests" | "groups" | "new" | "create" | null;
@@ -144,7 +145,9 @@ export function MessagesScreen() {
                     <div className="request-row" key={user.id}>
                       <AvatarRing user={user} size="md" />
                       <div>
-                        <strong>{user.displayName}</strong>
+                        <strong>
+                          <VerifiedName user={user} />
+                        </strong>
                         <span>@{user.username} wants to befriend you</span>
                       </div>
                       <button
@@ -222,7 +225,9 @@ export function MessagesScreen() {
                   <div className="request-row" key={friend.id}>
                     <AvatarRing user={friend} size="md" />
                     <div>
-                      <strong>{friend.displayName}</strong>
+                      <strong>
+                        <VerifiedName user={friend} />
+                      </strong>
                       <span>@{friend.username}</span>
                     </div>
                     <button
@@ -263,7 +268,9 @@ export function MessagesScreen() {
                       onClick={() => toggleMember(friend.id)}
                     >
                       <AvatarRing user={friend} size="sm" showInstant={false} />
-                      <span>{friend.displayName}</span>
+                      <span>
+                        <VerifiedName user={friend} />
+                      </span>
                     </button>
                   );
                 })}
@@ -290,7 +297,9 @@ export function MessagesScreen() {
                 <span className={thread.unreadCount > 0 ? "unread-dot" : "unread-dot idle"} />
                 <AvatarRing user={otherUser} size="md" />
                 <div className="message-main">
-                  <strong>{otherUser.displayName}</strong>
+                  <strong>
+                    <VerifiedName user={otherUser} />
+                  </strong>
                   <span>{thread.lastMessage}</span>
                 </div>
                 <div className="message-meta">

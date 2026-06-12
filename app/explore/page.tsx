@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { ExploreScreen } from "@/components/screens/ExploreScreen";
 
 export default function ExplorePage() {
-  return <ExploreScreen />;
+  return (
+    <Suspense fallback={<div className="screen" />}>
+      <ExploreScreen />
+    </Suspense>
+  );
 }

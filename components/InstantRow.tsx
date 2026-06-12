@@ -5,6 +5,7 @@ import { Camera, FileText, Video, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
+import { VerifiedName } from "@/components/VerifiedName";
 import type { User } from "@/data/types";
 import { useAppState } from "@/state/AppState";
 
@@ -120,7 +121,11 @@ export function InstantRow({ users, includeCurrent = false, notes = false }: Ins
                 ) : null}
               </div>
               <span>
-                {(includeCurrent || notes) && index === 0 ? "Your Instant" : user.displayName}
+                {(includeCurrent || notes) && index === 0 ? (
+                  "Your Instant"
+                ) : (
+                  <VerifiedName user={user} />
+                )}
               </span>
             </div>
           );
@@ -259,7 +264,9 @@ export function InstantRow({ users, includeCurrent = false, notes = false }: Ins
               <X size={22} />
             </button>
             <AvatarRing user={expandedNote} size="lg" />
-            <h2>{expandedNote.displayName}</h2>
+            <h2>
+              <VerifiedName user={expandedNote} />
+            </h2>
             <p>{expandedNote.note}</p>
           </div>
         </div>

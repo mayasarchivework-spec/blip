@@ -6,10 +6,10 @@ import {
   Camera,
   ChevronLeft,
   Flag,
-  Image as ImageIcon,
   ImagePlus,
   Info,
   Plus,
+  Send,
   Star,
   Sticker,
   Trash2,
@@ -235,11 +235,14 @@ export function ChatScreen({ threadId }: { threadId: string }) {
           placeholder="send a message..."
           aria-label="Message"
         />
-        <BlipButton type="button" variant="secondary" aria-label="Camera">
-          <Camera size={24} />
-        </BlipButton>
-        <BlipButton type="button" variant="secondary" aria-label="Image">
-          <ImageIcon size={24} />
+        <BlipButton
+          type="submit"
+          className="chat-send-button"
+          disabled={!draftMessage.trim()}
+          aria-label="Send message"
+        >
+          <Send size={20} />
+          <span>Send</span>
         </BlipButton>
         <BlipButton
           type="button"

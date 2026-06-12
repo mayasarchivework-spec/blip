@@ -51,6 +51,7 @@ create table if not exists public.profiles (
   display_name text not null,
   bio text default '',
   avatar_url text,
+  banner_url text,
   accent_color public.accent_color not null default 'blue',
   is_private boolean not null default false,
   allow_explore boolean not null default true,
@@ -187,6 +188,7 @@ alter table public.profiles add column if not exists username text;
 alter table public.profiles add column if not exists display_name text;
 alter table public.profiles add column if not exists bio text default '';
 alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists banner_url text;
 alter table public.profiles add column if not exists accent_color public.accent_color not null default 'blue';
 alter table public.profiles add column if not exists is_private boolean not null default false;
 alter table public.profiles add column if not exists allow_explore boolean not null default true;

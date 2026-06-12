@@ -1,17 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Check, MessageCircle, Plus, Search, Users, X } from "lucide-react";
+import { Check, MessageCircle, Plus, Search, Send, Users, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AvatarRing } from "@/components/AvatarRing";
 import { InstantRow } from "@/components/InstantRow";
 import { useAppState } from "@/state/AppState";
 
-type MessagePanel = "requests" | "groups" | "create" | null;
+type MessagePanel = "requests" | "groups" | "new" | "create" | null;
 
 export function MessagesScreen() {
-  const { answerFriendRequest, currentUser, getFriends, getUserById, threads } =
+  const router = useRouter();
+  const { answerFriendRequest, currentUser, getFriends, getUserById, startThread, threads } =
     useAppState();
   const [panel, setPanel] = useState<MessagePanel>(null);
   const [handledRequests, setHandledRequests] = useState<string[]>([]);
@@ -72,6 +74,13 @@ export function MessagesScreen() {
     setPanel("groups");
   }
 
+  function openChat(userId: string) {
+    const threadId = startThread(userId);
+    if (threadId) {
+      router.push(`/messages/${threadId}`);
+    }
+  }
+
   return (
     <div className="screen">
       <AppHeader title="Messages" />
@@ -96,6 +105,14 @@ export function MessagesScreen() {
         </button>
         <button
           type="button"
+          className={panel === "new" ? "active" : ""}
+          onClick={() => setPanel(panel === "new" ? null : "new")}
+        >
+          <Send size={24} />
+          <span>New chat</span>
+        </button>
+        <button
+          type="button"
           className="create-group"
           onClick={() => setPanel(panel === "create" ? null : "create")}
         >
@@ -111,7 +128,9 @@ export function MessagesScreen() {
                 ? "Message requests"
                 : panel === "groups"
                   ? "Groups"
-                  : "Create group"}
+                  : panel === "new"
+                    ? "New chat"
+                    : "Create group"}
             </strong>
             <button type="button" onClick={() => setPanel(null)} aria-label="Close panel">
               <X size={20} />
@@ -194,6 +213,30 @@ export function MessagesScreen() {
                   </button>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {panel === "new" ? (
+            <div className="request-list">
+              {friends.length ? (
+                friends.map((friend) => (
+                  <div className="request-row" key={friend.id}>
+                    <AvatarRing user={friend} size="md" />
+                    <div>
+                      <strong>{friend.displayName}</strong>
+                      <span>@{friend.username}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="mini-action accept"
+                      onClick={() => openChat(friend.id)}
+                    >
+                      <Send size={17} /> Message
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="panel-empty">Add friends to start a chat.</p>
+              )}
             </div>
           ) : null}
           {panel === "create" ? (

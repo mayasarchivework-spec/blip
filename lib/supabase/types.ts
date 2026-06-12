@@ -14,6 +14,7 @@ export interface ProfileRow {
   display_name: string;
   bio: string | null;
   avatar_url: string | null;
+  banner_url: string | null;
   accent_color: AccentName;
   is_private: boolean;
   allow_explore: boolean;

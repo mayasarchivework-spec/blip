@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Play, X } from "lucide-react";
 import { useState } from "react";
-import { BlipReactionIcon } from "@/components/BlipReactionIcon";
+import { BlipReactionButton } from "@/components/BlipReactionButton";
 import { PostCard } from "@/components/PostCard";
 import { PostContent } from "@/components/PostContent";
 import type { Post } from "@/data/types";
@@ -23,7 +23,6 @@ export function PostGrid({
   showPinnedLabels = false
 }: PostGridProps) {
   const { blipPost, getUserById, hasBlipped } = useAppState();
-  const [burstPostId, setBurstPostId] = useState<string | null>(null);
   const [expandedPost, setExpandedPost] = useState<Post | null>(null);
 
   function handleTileBlip(post: Post, interactable: boolean) {
@@ -31,13 +30,7 @@ export function PostGrid({
       return;
     }
 
-    const willUnlike = hasBlipped(post.id);
     blipPost(post.id, post.userId);
-    if (!willUnlike) {
-      setBurstPostId(null);
-      window.setTimeout(() => setBurstPostId(post.id), 0);
-      window.setTimeout(() => setBurstPostId(null), 560);
-    }
   }
 
   return (
@@ -75,23 +68,20 @@ export function PostGrid({
                   <Play size={22} fill="currentColor" />
                 </span>
               ) : null}
-              <button
-                type="button"
-                className={`tile-blip ${blipped ? "blipped" : ""} ${
-                  burstPostId === post.id ? "blip-burst" : ""
-                }`}
-                disabled={!interactable}
-                aria-label="Blip post"
-                aria-pressed={blipped}
+              <span
+                className="tile-blip"
                 onClick={(event) => {
                   event.stopPropagation();
-                  handleTileBlip(post, interactable);
                 }}
               >
-                <BlipReactionIcon active={blipped} size={18} />
-                <span>{post.blips}</span>
-                {burstPostId === post.id ? <i className="blip-pop">+1</i> : null}
-              </button>
+                <BlipReactionButton
+                  active={blipped}
+                  count={post.blips}
+                  compact
+                  disabled={!interactable}
+                  onClick={() => handleTileBlip(post, interactable)}
+                />
+              </span>
             </div>
           </article>
         );

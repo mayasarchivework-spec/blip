@@ -17,6 +17,7 @@ type ProfileUpdate = Partial<
     | "accent_color"
     | "allow_explore"
     | "avatar_url"
+    | "banner_url"
     | "bio"
     | "display_name"
     | "is_private"

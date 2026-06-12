@@ -102,6 +102,7 @@ interface AppStateValue {
   backendSource: "mock" | "supabase";
   backendReady: boolean;
   backendLoading: boolean;
+  isGuest: boolean;
   authError: string | null;
   authSession: SupabaseAuthSession | null;
   authStatus: "idle" | "loading" | "authenticated";
@@ -122,6 +123,7 @@ interface AppStateValue {
   getCommentsForPost: (postId: string) => PostComment[] | undefined;
   loadPostComments: (postId: string) => Promise<void>;
   addPostComment: (postId: string, ownerId: string, body: string) => Promise<void>;
+  startThread: (userId: string) => string | null;
   sendThreadMessage: (threadId: string, body: string) => Promise<void>;
   replyToInstant: (userId: string, body: string) => Promise<string | null>;
   answerFriendRequest: (requestId: string, status: "accepted" | "ignored") => void;
@@ -391,6 +393,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     () => buildAppDataset(snapshot, authSession?.user.id),
     [authSession?.user.id, snapshot]
   );
+  const isGuest = !authSession;
   const baseCurrentUser = useMemo(
     () =>
       dataset.users.find((user) => user.id === dataset.currentUserId) ??
@@ -699,7 +702,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const posts = useMemo(
     () =>
-      [...localPosts, ...dataset.posts]
+      [...(isGuest ? [] : localPosts), ...dataset.posts]
         .filter((post) => post.type !== "song" && !hiddenPostIds.includes(post.id))
         .map((post) => ({
           ...post,
@@ -712,6 +715,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       commentOverrides,
       dataset.posts,
       hiddenPostIds,
+      isGuest,
       localPosts,
       pinnedPostOverrides
     ]
@@ -733,9 +737,24 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           timestamp: localMessages.length ? "now" : thread.timestamp
         };
       });
-      const localOnlyThreads = localThreads.filter(
-        (thread) => !mergedThreads.some((item) => item.id === thread.id)
-      );
+      const localOnlyThreads = isGuest
+        ? []
+        : localThreads
+            .filter((thread) => !mergedThreads.some((item) => item.id === thread.id))
+            .map((thread) => {
+              const localMessages = threadMessageOverrides[thread.id] ?? [];
+              const messages = [...thread.messages, ...localMessages].filter(
+                (message) => message.type !== "song"
+              );
+              const lastMessage = messages[messages.length - 1];
+
+              return {
+                ...thread,
+                messages,
+                lastMessage: lastMessage?.content ?? thread.lastMessage,
+                timestamp: localMessages.length ? "now" : thread.timestamp
+              };
+            });
 
       return [...localOnlyThreads, ...mergedThreads].sort((a, b) => {
         const aOther = a.participantIds.find((id) => id !== currentUser.id) ?? "";
@@ -743,13 +762,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         return Number(favoriteUserIds.includes(bOther)) - Number(favoriteUserIds.includes(aOther));
       });
     },
-    [currentUser.id, dataset.threads, favoriteUserIds, localThreads, threadMessageOverrides]
+    [
+      currentUser.id,
+      dataset.threads,
+      favoriteUserIds,
+      isGuest,
+      localThreads,
+      threadMessageOverrides
+    ]
   );
 
   const instants = useMemo(
     () =>
-      [...localInstants, ...dataset.instants].filter((instant) => instant.type !== "song"),
-    [dataset.instants, localInstants]
+      [...(isGuest ? [] : localInstants), ...dataset.instants].filter(
+        (instant) => instant.type !== "song"
+      ),
+    [dataset.instants, isGuest, localInstants]
   );
 
   const getUserById = useCallback(
@@ -771,8 +799,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const canInteractWith = useCallback(
-    (userId: string) => isOwner(userId) || isFriend(userId),
-    [isFriend, isOwner]
+    (userId: string) => !isGuest && (isOwner(userId) || isFriend(userId)),
+    [isFriend, isGuest, isOwner]
   );
 
   const getFriends = useCallback(
@@ -1065,6 +1093,38 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [authSession?.access_token, currentUser.id]
   );
 
+  const startThread = useCallback(
+    (userId: string) => {
+      if (!userId || userId === currentUser.id) {
+        return null;
+      }
+
+      const existingThread = threads.find(
+        (thread) =>
+          thread.participantIds.includes(currentUser.id) &&
+          thread.participantIds.includes(userId)
+      );
+
+      if (existingThread) {
+        return existingThread.id;
+      }
+
+      const threadId = `local-thread-${currentUser.id}-${userId}-${Date.now()}`;
+      const nextThread: MessageThread = {
+        id: threadId,
+        participantIds: [currentUser.id, userId],
+        lastMessage: "new conversation",
+        timestamp: "now",
+        unreadCount: 0,
+        messages: []
+      };
+
+      setLocalThreads((items) => [nextThread, ...items]);
+      return threadId;
+    },
+    [currentUser.id, threads]
+  );
+
   const replyToInstant = useCallback(
     async (userId: string, body: string) => {
       const trimmed = body.trim();
@@ -1320,6 +1380,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           display_name: updates.displayName,
           bio: updates.bio,
           avatar_url: updates.avatarUrl,
+          banner_url: updates.bannerUrl,
           profile_line: updates.location ?? updates.profileLine
         },
         authSession?.access_token
@@ -1405,6 +1466,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       backendSource: dataset.source,
       backendReady,
       backendLoading,
+      isGuest,
       authError,
       authSession,
       authStatus,
@@ -1426,6 +1488,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       loadPostComments,
       addPostComment,
       sendThreadMessage,
+      startThread,
       replyToInstant,
       answerFriendRequest,
       signIn,
@@ -1471,6 +1534,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       authStatus,
       backendReady,
       backendLoading,
+      isGuest,
       blippedPostIds,
       canInteractWith,
       closeComposer,
@@ -1509,6 +1573,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       saveProfile,
       saveSticker,
       sendThreadMessage,
+      startThread,
       signIn,
       signOut,
       signUp,

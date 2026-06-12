@@ -36,6 +36,7 @@ export function ExploreScreen() {
     effectiveUser,
     getUserById,
     hasRequested,
+    isGuest,
     isFriend,
     posts,
     requestFriend,
@@ -125,7 +126,9 @@ export function ExploreScreen() {
           ))}
         </div>
         <p className="privacy-notice">
-          View public profiles and posts. Only friends can interact.
+          {isGuest
+            ? "Browse public Blips. Sign up or sign in to add friends, blip, comment, or share."
+            : "View public profiles and posts. Only friends can interact."}
         </p>
       </section>
       <section className="people-card">
@@ -146,10 +149,10 @@ export function ExploreScreen() {
                   </Link>
                   <BlipButton
                     type="button"
-                    disabled={requested}
+                    disabled={isGuest || requested}
                     onClick={() => requestFriend(user.id)}
                   >
-                    {requested ? "Request sent" : "Add friend"}
+                    {isGuest ? "Sign in to add" : requested ? "Request sent" : "Add friend"}
                   </BlipButton>
                 </div>
               );

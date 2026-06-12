@@ -69,8 +69,8 @@ export function AuthPanel() {
           <UserRound size={24} />
         </div>
         <div>
-          <h2>Connect Supabase account</h2>
-          <p>Sign in to use the real Blip tables with your user permissions.</p>
+          <h2>Join Blip</h2>
+          <p>Sign up or sign in to post, blip, comment, message friends, and edit your profile.</p>
         </div>
       </div>
       <div className="auth-tabs">

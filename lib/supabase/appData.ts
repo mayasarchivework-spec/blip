@@ -105,7 +105,7 @@ export function buildAppDataset(
   snapshot: SupabaseSnapshot | null,
   preferredCurrentUserId?: string | null
 ): AppDataset {
-  if (!snapshot || snapshot.profiles.length === 0) {
+  if (!snapshot) {
     return {
       users: mockUsers,
       posts: mockPosts,
@@ -116,13 +116,30 @@ export function buildAppDataset(
     };
   }
 
-  const remoteUsers = snapshot.profiles.map((profile) => {
+  const validProfiles = snapshot.profiles.filter(isRenderableProfileRow);
+
+  if (validProfiles.length === 0) {
+    return {
+      users: [],
+      posts: [],
+      instants: [],
+      threads: [],
+      currentUserId,
+      source: "supabase"
+    };
+  }
+
+  const remoteUsers = validProfiles.map((profile) => {
+    const username = cleanProfileText(profile.username, "blip");
+    const displayName = cleanProfileText(profile.display_name, username);
+
     return {
       id: profile.id,
-      username: profile.username,
-      displayName: profile.display_name,
-      bio: profile.bio ?? "",
+      username,
+      displayName,
+      bio: cleanProfileText(profile.bio, ""),
       avatarUrl: profile.avatar_url ?? "/assets/avatar-racer.svg",
+      bannerUrl: profile.banner_url ?? undefined,
       accentColor: profile.accent_color,
       isPrivate: profile.is_private,
       allowExplore: profile.allow_explore,
@@ -139,6 +156,7 @@ export function buildAppDataset(
   });
 
   const users = remoteUsers;
+  const validUserIds = new Set(users.map((user) => user.id));
 
   for (const friendship of snapshot.friendships) {
     addFriendship(users, friendship.user_low, friendship.user_high);
@@ -154,7 +172,10 @@ export function buildAppDataset(
     });
   }
 
-  const posts = snapshot.posts.filter(isRenderablePostRow).map(mapPostRow);
+  const posts = snapshot.posts
+    .filter((post) => validUserIds.has(post.user_id))
+    .filter(isRenderablePostRow)
+    .map(mapPostRow);
 
   const postStats = getPostStats(posts);
   const usersWithStats = users.map((user) => {
@@ -185,9 +206,18 @@ export function buildAppDataset(
       (preferredCurrentUserId &&
       usersWithStats.some((user) => user.id === preferredCurrentUserId)
         ? preferredCurrentUserId
-        : usersWithStats[0]?.id) ?? currentUserId,
+        : currentUserId),
     source: "supabase"
   };
+}
+
+function cleanProfileText(value: string | null | undefined, fallback: string) {
+  const text = normalizedText(value);
+  return text && text.toLowerCase() !== "null" ? text : fallback;
+}
+
+function isRenderableProfileRow(row: ProfileRow) {
+  return hasMeaningfulText(row.id) && hasMeaningfulText(row.username);
 }
 
 export function mapCommentRow(row: CommentRow): PostComment {

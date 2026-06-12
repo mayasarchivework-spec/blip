@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
-import { BlipReactionIcon } from "@/components/BlipReactionIcon";
+import { BlipReactionButton } from "@/components/BlipReactionButton";
 import { PostContent } from "@/components/PostContent";
 import type { Post } from "@/data/types";
 import { copyToClipboard } from "@/lib/copyToClipboard";
@@ -52,7 +52,6 @@ export function PostCard({
   const [expanded, setExpanded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [blipBurst, setBlipBurst] = useState(false);
   const [draftComment, setDraftComment] = useState("");
   const [menuMessage, setMenuMessage] = useState("");
   const user = getUserById(post.userId);
@@ -86,13 +85,7 @@ export function PostCard({
       return;
     }
 
-    const willUnlike = hasBlipped(post.id);
     blipPost(post.id, post.userId);
-    if (!willUnlike) {
-      setBlipBurst(false);
-      window.setTimeout(() => setBlipBurst(true), 0);
-      window.setTimeout(() => setBlipBurst(false), 560);
-    }
   }
 
   function addComment() {
@@ -183,20 +176,12 @@ export function PostCard({
       </div>
       {post.caption ? <p className="post-caption">{post.caption}</p> : null}
       <div className="post-actions">
-        <button
-          type="button"
-          className={`post-blip-button ${blipped ? "blipped" : ""} ${
-            blipBurst ? "blip-burst" : ""
-          }`}
+        <BlipReactionButton
+          active={blipped}
+          count={post.blips}
           onClick={handleBlip}
           disabled={!canInteract}
-          aria-label="Blip post"
-          aria-pressed={blipped}
-        >
-          <BlipReactionIcon active={blipped} size={23} />
-          <span>{post.blips} blips</span>
-          {blipBurst ? <i className="blip-pop">+1</i> : null}
-        </button>
+        />
         <button
           type="button"
           disabled={!canInteract}

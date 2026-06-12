@@ -1461,23 +1461,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const pinPost = useCallback(
     (postId: string) => {
-      const ownedPhotoPosts = posts.filter(
-        (post) => post.userId === currentUser.id && post.type === "photo"
+      const targetPost = posts.find(
+        (post) => post.id === postId && post.userId === currentUser.id
       );
-      const pinnedPhotos = ownedPhotoPosts.filter((post) => post.isPinned);
-      const targetPost = ownedPhotoPosts.find((post) => post.id === postId);
 
       if (!targetPost) {
         return;
       }
 
-      if (!targetPost.isPinned && pinnedPhotos.length >= 3) {
-        return;
-      }
-
       setLocalPosts((items) =>
         items.map((post) => {
-          if (post.id !== postId || post.type !== "photo") {
+          if (post.id !== postId) {
             return post;
           }
 

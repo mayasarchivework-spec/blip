@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
+import { BlipButton } from "@/components/BlipButton";
 import { BlipReactionButton } from "@/components/BlipReactionButton";
 import { PostContent } from "@/components/PostContent";
 import { RichText } from "@/components/RichText";
@@ -51,6 +52,10 @@ function splitCaption(value: string | undefined) {
 
 function buildCaption(caption: string, hashtags: string) {
   return [caption.trim(), formatHashtags(hashtags)].filter(Boolean).join(" ");
+}
+
+function cleanImageUrls(urls: Array<string | undefined>) {
+  return urls.filter((url): url is string => Boolean(url)).slice(0, 20);
 }
 
 interface PostCardProps {
@@ -85,6 +90,9 @@ export function PostCard({
   const [editCaption, setEditCaption] = useState("");
   const [editHashtags, setEditHashtags] = useState("");
   const [editImages, setEditImages] = useState<string[]>([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("spam");
   const [draftComment, setDraftComment] = useState("");
   const [menuMessage, setMenuMessage] = useState("");
   const user = getUserById(post.userId);
@@ -133,9 +141,9 @@ export function PostCard({
 
   function openEditModal() {
     const { caption, hashtags } = splitCaption(post.caption);
-    const images = (post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [])
-      .filter(Boolean)
-      .slice(0, 20);
+    const images = cleanImageUrls(
+      post.imageUrls?.length ? post.imageUrls : [post.imageUrl]
+    );
 
     setEditCaption(caption);
     setEditHashtags(hashtags);
@@ -163,13 +171,13 @@ export function PostCard({
           })
       )
     ).then((urls) => {
-      setEditImages((images) => [...images, ...urls.filter(Boolean)].slice(0, 20));
+      setEditImages((images) => cleanImageUrls([...images, ...urls]));
     });
   }
 
   function savePostEdits() {
     const finalCaption = buildCaption(editCaption, editHashtags);
-    const images = editImages.filter(Boolean).slice(0, 20);
+    const images = cleanImageUrls(editImages);
 
     editPost(post.id, {
       caption: finalCaption || undefined,
@@ -180,6 +188,48 @@ export function PostCard({
     setEditOpen(false);
     setMenuMessage("post updated");
     window.setTimeout(() => setMenuMessage(""), 1200);
+  }
+
+  function showMenuToast(message: string) {
+    setMenuMessage(message);
+    window.setTimeout(() => setMenuMessage(""), 1400);
+  }
+
+  function handlePinPost() {
+    pinPost(post.id);
+    setMoreOpen(false);
+    showMenuToast(post.isPinned ? "post unpinned" : "post pinned");
+  }
+
+  function handleHidePost() {
+    hidePost(post.id);
+    setMoreOpen(false);
+    showMenuToast("post hidden");
+  }
+
+  function openDeleteConfirm() {
+    setMoreOpen(false);
+    setDeleteConfirmOpen(true);
+  }
+
+  function confirmDeletePost() {
+    deletePost(post.id);
+    setDeleteConfirmOpen(false);
+  }
+
+  function openReportModal() {
+    setMoreOpen(false);
+    setReportOpen(true);
+  }
+
+  function submitReport() {
+    setReportOpen(false);
+    showMenuToast(`report sent: ${reportReason.replace("-", " ")}`);
+  }
+
+  function handleBlockAuthor() {
+    setMoreOpen(false);
+    showMenuToast(`${postUser.displayName} blocked`);
   }
 
   async function copyShareLink(message = "link copied") {
@@ -336,32 +386,100 @@ export function PostCard({
                 <Edit3 size={17} />
                 <span>Edit</span>
               </button>
-              <button type="button" onClick={() => pinPost(post.id)}>
+              <button type="button" onClick={handlePinPost}>
                 <Pin size={17} />
-                <span>{post.isPinned ? "Unpin" : "Pin photo"}</span>
+                <span>{post.isPinned ? "Unpin post" : "Pin post"}</span>
               </button>
-              <button type="button" onClick={() => hidePost(post.id)}>
+              <button type="button" onClick={handleHidePost}>
                 <EyeOff size={17} />
                 <span>Hide</span>
               </button>
-              <button type="button" className="danger-menu-item" onClick={() => deletePost(post.id)}>
+              <button type="button" className="danger-menu-item" onClick={openDeleteConfirm}>
                 <Trash2 size={17} />
                 <span>Delete</span>
               </button>
             </>
           ) : (
             <>
-              <button type="button" onClick={() => setMenuMessage("reported")}>
+              <button type="button" onClick={openReportModal}>
                 <Flag size={17} />
                 <span>Report</span>
               </button>
-              <button type="button" onClick={() => setMenuMessage("blocked")}>
+              <button type="button" onClick={handleBlockAuthor}>
                 <Ban size={17} />
                 <span>Block</span>
               </button>
             </>
           )}
           {menuMessage ? <p>{menuMessage}</p> : null}
+        </div>
+      ) : null}
+      {menuMessage && !moreOpen && !shareOpen ? (
+        <div className="post-action-toast">{menuMessage}</div>
+      ) : null}
+      {deleteConfirmOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="post-confirm-modal">
+            <button
+              className="modal-close"
+              type="button"
+              onClick={() => setDeleteConfirmOpen(false)}
+              aria-label="Cancel delete"
+            >
+              <X size={22} />
+            </button>
+            <h2>Delete post?</h2>
+            <p>This removes it from your Blip feed and profile.</p>
+            <div className="editor-action-row">
+              <BlipButton type="button" variant="secondary" onClick={() => setDeleteConfirmOpen(false)}>
+                Cancel
+              </BlipButton>
+              <BlipButton type="button" variant="danger" onClick={confirmDeletePost}>
+                Delete
+              </BlipButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {reportOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="post-confirm-modal">
+            <button
+              className="modal-close"
+              type="button"
+              onClick={() => setReportOpen(false)}
+              aria-label="Close report"
+            >
+              <X size={22} />
+            </button>
+            <h2>Report post</h2>
+            <p>Pick the closest reason. For now this is saved as a prototype action.</p>
+            <div className="report-reason-list">
+              {[
+                ["spam", "Spam or scam"],
+                ["harassment", "Harassment"],
+                ["unsafe", "Unsafe content"],
+                ["other", "Something else"]
+              ].map(([value, label]) => (
+                <label key={value}>
+                  <input
+                    type="radio"
+                    checked={reportReason === value}
+                    onChange={() => setReportReason(value)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="editor-action-row">
+              <BlipButton type="button" variant="secondary" onClick={() => setReportOpen(false)}>
+                Cancel
+              </BlipButton>
+              <BlipButton type="button" variant="danger" onClick={submitReport}>
+                Send report
+              </BlipButton>
+            </div>
+          </div>
         </div>
       ) : null}
       {editOpen ? (

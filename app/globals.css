@@ -2941,6 +2941,23 @@ button:disabled {
   color: var(--danger) !important;
 }
 
+.post-action-toast {
+  position: absolute;
+  right: 14px;
+  bottom: 54px;
+  z-index: 7;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 91, 210, 0.22);
+  border-radius: 999px;
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 800;
+  background: linear-gradient(#ffffff, #eef6ff);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 8px 20px rgba(0, 0, 0, 0.16);
+}
+
 .expanded-post {
   position: relative;
   width: min(94vw, 640px);
@@ -3129,6 +3146,7 @@ button:disabled {
 
 .edit-profile-modal,
 .post-edit-modal,
+.post-confirm-modal,
 .instant-create-modal,
 .note-create-modal {
   position: relative;
@@ -3146,6 +3164,7 @@ button:disabled {
 
 .edit-profile-modal h2,
 .post-edit-modal h2,
+.post-confirm-modal h2,
 .instant-create-modal h2,
 .note-create-modal h2 {
   margin: 0;
@@ -3246,6 +3265,39 @@ button:disabled {
 
 .post-edit-modal {
   width: min(94vw, 540px);
+}
+
+.post-confirm-modal {
+  width: min(92vw, 390px);
+}
+
+.post-confirm-modal p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.report-reason-list {
+  display: grid;
+  gap: 8px;
+}
+
+.report-reason-list label {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 9px;
+  color: #252525;
+  font-weight: 800;
+  background: linear-gradient(#ffffff, #f2f2f2);
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+.report-reason-list input {
+  accent-color: var(--accent-color);
 }
 
 .post-edit-image-head {

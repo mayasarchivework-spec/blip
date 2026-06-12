@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320">
+  <defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0e1724"/><stop offset="1" stop-color="#05070a"/></linearGradient></defs>
+  <rect width="320" height="320" fill="url(#a)"/>
+  <path d="M48 218c42-92 104-133 188-124 32 3 57 13 76 30v196H48Z" fill="#101820"/>
+  <path d="M158 65l28 70 76 5-60 46 20 74-64-43-64 43 20-74-60-46 76-5Z" fill="#2f8cff"/>
+  <path d="M30 260c94-52 185-54 290-8" stroke="#f36cb5" stroke-width="6" opacity=".8"/>
+  <text x="32" y="46" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800">SOFT STATIC</text>
+</svg>

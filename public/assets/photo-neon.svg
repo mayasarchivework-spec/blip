@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 520">
+  <rect width="520" height="520" fill="#08111b"/>
+  <path d="M0 370h520v150H0Z" fill="#05090e"/>
+  <path d="M80 390 290 126h132" fill="none" stroke="#005ecf" stroke-width="6"/>
+  <text x="306" y="156" fill="#7ed8ff" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700">blip</text>
+  <text x="306" y="218" fill="#7ed8ff" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700">blip</text>
+  <text x="306" y="280" fill="#7ed8ff" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700">blip</text>
+  <g opacity=".45" stroke="#0c4e95"><path d="M70 430h410"/><path d="M90 400h410"/><path d="M112 370h390"/></g>
+</svg>

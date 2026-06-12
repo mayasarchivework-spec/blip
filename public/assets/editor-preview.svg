@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 620">
+  <defs><linearGradient id="garage" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#1e2228"/><stop offset=".5" stop-color="#101319"/><stop offset="1" stop-color="#050608"/></linearGradient></defs>
+  <rect width="920" height="620" fill="url(#garage)"/>
+  <path d="M0 470c170-60 315-66 462-24 138 39 312 36 458-8v182H0Z" fill="#0b0d10"/>
+  <g fill="#e7f4ff" opacity=".8"><circle cx="150" cy="128" r="12"/><circle cx="286" cy="96" r="10"/><circle cx="718" cy="132" r="10"/><circle cx="820" cy="96" r="8"/></g>
+  <rect x="646" y="40" width="210" height="570" fill="#202226" opacity=".75"/>
+  <circle cx="468" cy="170" r="76" fill="#dfb7a6"/>
+  <path d="M365 182c5-91 48-130 120-103 44 16 66 59 60 113-34-38-84-50-160-17Z" fill="#111"/>
+  <rect x="399" y="148" width="59" height="26" rx="13" fill="#090909"/>
+  <rect x="470" y="148" width="59" height="26" rx="13" fill="#090909"/>
+  <path d="M280 620c22-194 97-297 208-270 84 20 138 113 158 270Z" fill="#e9e4de"/>
+  <path d="M311 620h317l-27-168c-84 38-181 36-292-2Z" fill="#314052"/>
+  <rect x="576" y="157" width="82" height="113" rx="14" fill="#d8b69d"/>
+  <circle cx="626" cy="178" r="8" fill="#2c211b"/>
+  <rect x="655" y="458" width="110" height="135" rx="18" fill="#d69ab8"/>
+</svg>

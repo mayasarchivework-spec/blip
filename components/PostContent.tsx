@@ -1,4 +1,8 @@
-import { Play } from "lucide-react";
+"use client";
+
+import { ChevronLeft, ChevronRight, Play } from "lucide-react";
+import type { MouseEvent } from "react";
+import { useState } from "react";
 import { TextPost } from "@/components/TextPost";
 import type { Post } from "@/data/types";
 
@@ -7,10 +11,83 @@ interface PostContentProps {
   compact?: boolean;
 }
 
+function cleanImageUrls(urls: Array<string | undefined>) {
+  return urls.filter((url): url is string => Boolean(url)).slice(0, 20);
+}
+
+interface MediaCarouselProps {
+  images: string[];
+  label: string;
+}
+
+function MediaCarousel({ images, label }: MediaCarouselProps) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const safeIndex = Math.min(activeIndex, Math.max(0, images.length - 1));
+
+  function move(direction: -1 | 1, event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    setActiveIndex((index) => {
+      const nextIndex = index + direction;
+
+      if (nextIndex < 0) {
+        return images.length - 1;
+      }
+
+      if (nextIndex >= images.length) {
+        return 0;
+      }
+
+      return nextIndex;
+    });
+  }
+
+  if (!images.length) {
+    return null;
+  }
+
+  return (
+    <div className="multi-image-carousel" aria-label={`${images.length} images`}>
+      <img src={images[safeIndex]} alt={`${label} ${safeIndex + 1}`} />
+      {images.length > 1 ? (
+        <>
+          <button
+            type="button"
+            className="post-media-nav post-media-nav-left"
+            onClick={(event) => move(-1, event)}
+            aria-label="Previous image"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <button
+            type="button"
+            className="post-media-nav post-media-nav-right"
+            onClick={(event) => move(1, event)}
+            aria-label="Next image"
+          >
+            <ChevronRight size={24} />
+          </button>
+          <span className="multi-image-count">
+            {safeIndex + 1}/{images.length}
+          </span>
+          <div className="post-media-dots" aria-hidden="true">
+            {images.slice(0, 10).map((imageUrl, index) => (
+              <span
+                key={`${imageUrl}-${index}`}
+                className={index === safeIndex ? "active" : ""}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function PostContent({ post, compact = false }: PostContentProps) {
-  const images = (post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [])
-    .filter(Boolean)
-    .slice(0, 20);
+  const images = cleanImageUrls(
+    post.imageUrls?.length ? post.imageUrls : [post.imageUrl]
+  );
+  const mediaLabel = post.caption ?? post.content;
 
   if (post.type === "text") {
     if (!images.length) {
@@ -21,16 +98,7 @@ export function PostContent({ post, compact = false }: PostContentProps) {
       <div className="text-post-with-media">
         <TextPost content={post.content} compact={compact} />
         <div className="media-frame media-frame-multiple media-free">
-          <div className="multi-image-strip" aria-label={`${images.length} images`}>
-            {images.map((imageUrl, index) => (
-              <img
-                key={`${imageUrl}-${index}`}
-                src={imageUrl}
-                alt={`${post.caption ?? post.content} ${index + 1}`}
-              />
-            ))}
-          </div>
-          {images.length > 1 ? <span className="multi-image-count">1/{images.length}</span> : null}
+          <MediaCarousel images={images} label={mediaLabel} />
         </div>
       </div>
     );
@@ -45,19 +113,10 @@ export function PostContent({ post, compact = false }: PostContentProps) {
       {post.type === "video" && post.videoUrl?.startsWith("data:video") ? (
         <video src={post.videoUrl} poster={images[0] ?? post.imageUrl} controls playsInline preload="metadata" />
       ) : images.length > 1 ? (
-        <div className="multi-image-strip" aria-label={`${images.length} images`}>
-          {images.map((imageUrl, index) => (
-            <img
-              key={`${imageUrl}-${index}`}
-              src={imageUrl}
-              alt={`${post.caption ?? post.content} ${index + 1}`}
-            />
-          ))}
-        </div>
+        <MediaCarousel images={images} label={mediaLabel} />
       ) : images[0] ? (
-        <img src={images[0]} alt={post.caption ?? post.content} />
+        <img src={images[0]} alt={mediaLabel} />
       ) : null}
-      {images.length > 1 ? <span className="multi-image-count">1/{images.length}</span> : null}
       {post.type === "video" && !post.videoUrl?.startsWith("data:video") ? (
         <span className="video-play">
           <Play size={36} fill="currentColor" />

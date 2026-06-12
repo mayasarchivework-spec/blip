@@ -18,6 +18,7 @@ import { useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
 import { RichText } from "@/components/RichText";
+import { ThinkingDots } from "@/components/ThinkingDots";
 import { VerifiedName } from "@/components/VerifiedName";
 import type { User } from "@/data/types";
 import { copyToClipboard } from "@/lib/copyToClipboard";
@@ -191,7 +192,7 @@ export function ProfileHeader({
   }
 
   return (
-    <section className="profile-card">
+    <section className={`profile-card ${user.bannerUrl ? "profile-card-with-banner" : ""}`}>
       {user.bannerUrl ? <img className="profile-banner" src={user.bannerUrl} alt="" /> : null}
       <div className="profile-top">
         <AvatarRing user={user} size="xl" onClick={() => openInstant(user.id)} />
@@ -216,6 +217,14 @@ export function ProfileHeader({
             <p className="profile-line">
               <RichText text={user.profileLine} />
             </p>
+          ) : null}
+          {user.note ? (
+            <div className="profile-note-bubble">
+              <ThinkingDots compact />
+              <span>
+                <RichText text={user.note} />
+              </span>
+            </div>
           ) : null}
         </div>
         {isOwnerProfile ? (

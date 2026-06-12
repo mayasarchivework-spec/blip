@@ -152,7 +152,7 @@ export function buildAppDataset(
       noteExpiresAt: activeNote(profile.note, profile.note_expires_at)
         ? profile.note_expires_at ?? undefined
         : undefined,
-      profileLine: profile.profile_line ?? undefined
+      profileLine: cleanProfileText(profile.profile_line, "") || undefined
     } satisfies User;
   });
 
@@ -259,19 +259,21 @@ function addFriendRequest(users: User[], request: FriendRequest) {
 
 function mapPostRow(row: PostRow): Post {
   const imageUrls = normalizedImageUrls(row.image_urls, row.image_url);
+  const content = cleanProfileText(row.content, row.type);
+  const caption = cleanProfileText(row.caption, "");
 
   return {
     id: row.id,
     userId: row.user_id,
     type: row.type,
-    content: row.content,
+    content,
     imageUrl: imageUrls[0] ?? row.image_url ?? undefined,
     imageUrls: imageUrls.length > 1 ? imageUrls : undefined,
     videoUrl: row.video_url ?? undefined,
     songTitle: row.song_title ?? undefined,
     artistName: row.artist_name ?? undefined,
     albumArtUrl: row.album_art_url ?? undefined,
-    caption: row.caption ?? undefined,
+    caption: caption || undefined,
     blips: row.blips_count ?? 0,
     comments: row.comments_count ?? 0,
     isPinned: row.is_pinned,
@@ -334,7 +336,7 @@ function mapInstantRow(row: InstantRow): Instant {
     type: row.type,
     content: row.content,
     thumbnailUrl: row.thumbnail_url ?? undefined,
-    expiresAt: relativeTime(row.expires_at)
+    expiresAt: row.expires_at
   };
 }
 

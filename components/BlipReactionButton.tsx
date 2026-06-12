@@ -60,7 +60,39 @@ export function BlipReactionButton({
             <clipPath id={clipId}>
               <circle cx="32" cy="32" r="21" />
             </clipPath>
+            <linearGradient id={`${clipId}-shine`} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stopColor="#ffffff" stopOpacity="0.42" />
+              <stop offset="0.46" stopColor="#ffffff" stopOpacity="0.08" />
+              <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
           </defs>
+
+          <motion.circle
+            cx="44"
+            cy="9"
+            r="3.3"
+            fill={color}
+            initial={false}
+            animate={
+              active
+                ? { opacity: [0.55, 1, 0.82], y: [-1, -3, -2], scale: [1, 1.22, 1] }
+                : { opacity: 0.72, y: 0, scale: 1 }
+            }
+            transition={{ duration: 0.45 }}
+          />
+          <motion.circle
+            cx="51"
+            cy="3"
+            r="2.5"
+            fill={color}
+            initial={false}
+            animate={
+              active
+                ? { opacity: [0.35, 0.9, 0.62], y: [-1, -4, -2], scale: [0.88, 1.18, 1] }
+                : { opacity: 0.55, y: 0, scale: 1 }
+            }
+            transition={{ duration: 0.5, delay: 0.03 }}
+          />
 
           <motion.circle
             cx="32"
@@ -77,6 +109,22 @@ export function BlipReactionButton({
           />
 
           <g clipPath={`url(#${clipId})`}>
+            <motion.circle
+              cx="32"
+              cy="32"
+              r="21"
+              fill={color}
+              initial={false}
+              animate={
+                active
+                  ? { opacity: 1, scale: [0.15, 1.12, 0.96, 1] }
+                  : { opacity: 0, scale: 0.15 }
+              }
+              transition={{ duration: 0.52, ease: [0.2, 0.9, 0.2, 1] }}
+            />
+          </g>
+
+          <g clipPath={`url(#${clipId})`}>
             <motion.path
               d="M 8 68 C 20 56, 28 62, 38 54 C 48 46, 56 54, 68 44 L 68 68 Z"
               fill={color}
@@ -87,7 +135,7 @@ export function BlipReactionButton({
                       y: [22, 2, -3, 0],
                       scaleY: [0.3, 1.12, 0.92, 1]
                     }
-                  : {
+                : {
                       y: 42,
                       scaleY: 0.2
                     }
@@ -97,6 +145,13 @@ export function BlipReactionButton({
                 ease: [0.2, 0.9, 0.2, 1]
               }}
             />
+            <motion.path
+              d="M 0 20 C 14 28, 24 16, 36 24 C 48 32, 54 18, 68 24 L 68 0 L 0 0 Z"
+              fill={`url(#${clipId}-shine)`}
+              initial={false}
+              animate={active ? { opacity: [0, 0.78, 0.28], y: [16, 2, 0] } : { opacity: 0, y: 18 }}
+              transition={{ duration: 0.55, ease: "easeOut" }}
+            />
           </g>
 
           <motion.circle
@@ -104,7 +159,7 @@ export function BlipReactionButton({
             cy="32"
             r="7"
             fill={active ? "#ffffff" : "currentColor"}
-            animate={active ? { scale: [1, 0.75, 1.25, 1] } : { scale: 1 }}
+            animate={active ? { scale: [1, 0.72, 1.28, 1] } : { scale: 1 }}
             transition={{ duration: 0.38 }}
           />
         </motion.svg>

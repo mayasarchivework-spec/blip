@@ -121,6 +121,7 @@ interface AppStateValue {
   getUserById: (id: string) => User | undefined;
   getUserByUsername: (username: string) => User | undefined;
   getFriends: () => User[];
+  getInstantsForUser: (userId: string) => Instant[];
   getInstantForUser: (userId: string) => Instant | undefined;
   getCommentsForPost: (postId: string) => PostComment[] | undefined;
   loadPostComments: (postId: string) => Promise<void>;
@@ -240,6 +241,12 @@ function isFutureIso(value: string | null | undefined) {
 
   const time = Date.parse(value);
   return Number.isFinite(time) && time > Date.now();
+}
+
+function isActiveInstant(instant: Instant) {
+  const expiresTime = Date.parse(instant.expiresAt);
+
+  return !Number.isFinite(expiresTime) || expiresTime > Date.now();
 }
 
 function stripProfileMedia(overrides: Partial<User> | undefined) {
@@ -853,7 +860,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const instants = useMemo(
     () =>
       [...(isGuest ? [] : localInstants), ...dataset.instants].filter(
-        (instant) => instant.type !== "song"
+        (instant) => instant.type !== "song" && isActiveInstant(instant)
       ),
     [dataset.instants, isGuest, localInstants]
   );
@@ -889,9 +896,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [currentUser.friendIds, users]
   );
 
-  const getInstantForUser = useCallback(
-    (userId: string) => instants.find((instant) => instant.userId === userId),
+  const getInstantsForUser = useCallback(
+    (userId: string) => instants.filter((instant) => instant.userId === userId),
     [instants]
+  );
+
+  const getInstantForUser = useCallback(
+    (userId: string) => getInstantsForUser(userId)[0],
+    [getInstantsForUser]
   );
 
   const getCommentsForPost = useCallback(
@@ -1416,12 +1428,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         content: instant.content,
         thumbnailUrl: instant.thumbnailUrl,
         videoUrl: instant.videoUrl,
-        expiresAt: "Tonight"
+        expiresAt: new Date(Date.now() + noteLifetimeMs).toISOString()
       };
 
       setLocalInstants((items) => [
         nextInstant,
-        ...items.filter((item) => item.userId !== currentUser.id)
+        ...items.filter(isActiveInstant)
       ]);
       setActiveInstantUserId(currentUser.id);
 
@@ -1612,6 +1624,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       getUserById,
       getUserByUsername,
       getFriends,
+      getInstantsForUser,
       getInstantForUser,
       getCommentsForPost,
       loadPostComments,
@@ -1681,6 +1694,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       favoriteUserIds,
       getCommentsForPost,
       getFriends,
+      getInstantsForUser,
       getInstantForUser,
       getUserById,
       getUserByUsername,

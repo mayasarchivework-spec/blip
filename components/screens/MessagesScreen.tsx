@@ -17,6 +17,7 @@ export function MessagesScreen() {
   const { answerFriendRequest, currentUser, getFriends, getUserById, startThread, threads } =
     useAppState();
   const [panel, setPanel] = useState<MessagePanel>(null);
+  const [openingChatUserId, setOpeningChatUserId] = useState<string | null>(null);
   const [handledRequests, setHandledRequests] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("late night plans");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([
@@ -75,10 +76,15 @@ export function MessagesScreen() {
     setPanel("groups");
   }
 
-  function openChat(userId: string) {
-    const threadId = startThread(userId);
-    if (threadId) {
-      router.push(`/messages/${threadId}`);
+  async function openChat(userId: string) {
+    setOpeningChatUserId(userId);
+    try {
+      const threadId = await startThread(userId);
+      if (threadId) {
+        router.push(`/messages/${threadId}`);
+      }
+    } finally {
+      setOpeningChatUserId(null);
     }
   }
 
@@ -233,9 +239,10 @@ export function MessagesScreen() {
                     <button
                       type="button"
                       className="mini-action accept"
-                      onClick={() => openChat(friend.id)}
+                      disabled={openingChatUserId === friend.id}
+                      onClick={() => void openChat(friend.id)}
                     >
-                      <Send size={17} /> Message
+                      <Send size={17} /> {openingChatUserId === friend.id ? "Opening..." : "Message"}
                     </button>
                   </div>
                 ))

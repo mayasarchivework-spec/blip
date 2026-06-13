@@ -16,6 +16,7 @@ import {
   X
 } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
 import { RichText } from "@/components/RichText";
@@ -35,6 +36,7 @@ export function ProfileHeader({
   isOwnerProfile,
   isFriendProfile
 }: ProfileHeaderProps) {
+  const router = useRouter();
   const {
     currentUser,
     getUserById,
@@ -45,12 +47,14 @@ export function ProfileHeader({
     removeFriend,
     requestFriend,
     saveProfile,
+    startThread,
     threads
   } = useAppState();
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [profilePanel, setProfilePanel] = useState<"friends" | "blips" | null>(null);
   const [shareMessage, setShareMessage] = useState("");
+  const [openingMessage, setOpeningMessage] = useState(false);
   const [form, setForm] = useState({
     username: user.username,
     displayName: user.displayName,
@@ -81,6 +85,23 @@ export function ProfileHeader({
     const copied = await copyToClipboard(profileUrl);
     setShareMessage(copied ? message : "select and copy this link");
     window.setTimeout(() => setShareMessage(""), 1200);
+  }
+
+  async function openMessageThread() {
+    if (messageThread) {
+      router.push(`/messages/${messageThread.id}`);
+      return;
+    }
+
+    setOpeningMessage(true);
+    try {
+      const threadId = await startThread(user.id);
+      if (threadId) {
+        router.push(`/messages/${threadId}`);
+      }
+    } finally {
+      setOpeningMessage(false);
+    }
   }
 
   const shareOptions = [
@@ -273,12 +294,14 @@ export function ProfileHeader({
             <BlipButton type="button" wide variant="secondary" disabled>
               Friends
             </BlipButton>
-            <Link
-              href={messageThread ? `/messages/${messageThread.id}` : "/messages"}
+            <button
+              type="button"
               className="blip-link-button"
+              disabled={openingMessage}
+              onClick={() => void openMessageThread()}
             >
-              Send message
-            </Link>
+              {openingMessage ? "Opening..." : "Send message"}
+            </button>
           </>
         ) : (
           <BlipButton

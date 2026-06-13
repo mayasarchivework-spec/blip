@@ -1,4 +1,10 @@
-import type { AccentName, AspectRatio, PostType } from "@/data/types";
+import type {
+  AccentName,
+  AspectRatio,
+  CommentAudience,
+  PostType,
+  ViewAudience
+} from "@/data/types";
 
 export type JsonValue =
   | string
@@ -19,6 +25,8 @@ export interface ProfileRow {
   accent_color: AccentName;
   is_private: boolean;
   allow_explore: boolean;
+  view_audience: ViewAudience;
+  comment_audience: CommentAudience;
   profile_line: string | null;
   note: string | null;
   note_expires_at: string | null;
@@ -112,5 +120,5 @@ export interface ThreadMemberRow {
   user_id: string;
   role: "owner" | "member";
   last_read_at: string | null;
-  created_at: string;
+  joined_at: string;
 }

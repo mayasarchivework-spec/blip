@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Camera, FileText, Video, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
@@ -16,9 +17,11 @@ interface InstantRowProps {
 }
 
 export function InstantRow({ users, includeCurrent = false, notes = false }: InstantRowProps) {
+  const router = useRouter();
   const {
     createInstant,
     currentUser,
+    getInstantForUser,
     openInstant,
     setUserNote,
     userNoteExpiresAt
@@ -72,6 +75,15 @@ export function InstantRow({ users, includeCurrent = false, notes = false }: Ins
     setInstantCreatorOpen(false);
   }
 
+  function openInstantOrProfile(user: User) {
+    if (getInstantForUser(user.id)) {
+      openInstant(user.id);
+      return;
+    }
+
+    router.push(`/profile/${user.username}`);
+  }
+
   return (
     <section className={notes ? "instant-card instant-card-notes" : "instant-card"}>
       <div className="instant-scroll">
@@ -100,7 +112,7 @@ export function InstantRow({ users, includeCurrent = false, notes = false }: Ins
                       setNoteCreatorOpen(true);
                       return;
                     }
-                    openInstant(user.id);
+                    openInstantOrProfile(user);
                   }}
                 />
                 {showOwnAdd ? (
@@ -131,7 +143,7 @@ export function InstantRow({ users, includeCurrent = false, notes = false }: Ins
           );
         })}
       </div>
-      <p className="instant-help">Tap a friend's photo to view their Instant</p>
+      <p className="instant-help">Tap a photo to view their Instant or profile</p>
       {instantCreatorOpen ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="instant-create-modal">

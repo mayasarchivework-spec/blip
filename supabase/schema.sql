@@ -56,6 +56,8 @@ create table if not exists public.profiles (
   accent_color public.accent_color not null default 'blue',
   is_private boolean not null default false,
   allow_explore boolean not null default true,
+  view_audience text not null default 'friends',
+  comment_audience text not null default 'friends',
   profile_line text,
   note text,
   note_expires_at timestamptz,
@@ -195,6 +197,8 @@ alter table public.profiles add column if not exists banner_url text;
 alter table public.profiles add column if not exists accent_color public.accent_color not null default 'blue';
 alter table public.profiles add column if not exists is_private boolean not null default false;
 alter table public.profiles add column if not exists allow_explore boolean not null default true;
+alter table public.profiles add column if not exists view_audience text not null default 'friends';
+alter table public.profiles add column if not exists comment_audience text not null default 'friends';
 alter table public.profiles add column if not exists profile_line text;
 alter table public.profiles add column if not exists note text;
 alter table public.profiles add column if not exists note_expires_at timestamptz;
@@ -205,6 +209,22 @@ alter table public.profiles drop constraint if exists profiles_account_role_chec
 alter table public.profiles
   add constraint profiles_account_role_check
   check (account_role in ('user', 'admin', 'owner'));
+
+alter table public.profiles drop constraint if exists profiles_view_audience_check;
+alter table public.profiles
+  add constraint profiles_view_audience_check
+  check (view_audience in ('friends', 'everyone'));
+
+alter table public.profiles drop constraint if exists profiles_comment_audience_check;
+alter table public.profiles
+  add constraint profiles_comment_audience_check
+  check (comment_audience in ('friends', 'everyone', 'none'));
+
+update public.profiles
+set view_audience = 'everyone'
+where is_private = false
+  and allow_explore = true
+  and view_audience = 'friends';
 
 alter table public.friend_requests add column if not exists from_user_id uuid references public.profiles(id) on delete cascade;
 alter table public.friend_requests add column if not exists to_user_id uuid references public.profiles(id) on delete cascade;
@@ -340,7 +360,7 @@ as $$
       from public.profiles p
       where p.id = owner_id
         and p.is_private = false
-        and p.allow_explore = true
+        and p.view_audience = 'everyone'
     );
 $$;
 
@@ -352,7 +372,16 @@ set search_path = public
 stable
 as $$
   select owner_id = auth.uid()
-    or public.are_friends(auth.uid(), owner_id);
+    or exists (
+      select 1
+      from public.profiles p
+      where p.id = owner_id
+        and p.comment_audience <> 'none'
+        and (
+          public.are_friends(auth.uid(), owner_id)
+          or (p.is_private = false and p.comment_audience = 'everyone')
+        )
+    );
 $$;
 
 create or replace function public.can_view_post(post_id uuid)
@@ -365,19 +394,14 @@ as $$
   select exists (
     select 1
     from public.posts p
+    join public.profiles owner on owner.id = p.user_id
     where p.id = post_id
       and (
         p.user_id = auth.uid()
         or public.are_friends(auth.uid(), p.user_id)
         or (
-          p.visibility = 'public'
-          and exists (
-            select 1
-            from public.profiles owner
-            where owner.id = p.user_id
-              and owner.is_private = false
-              and owner.allow_explore = true
-          )
+          owner.is_private = false
+          and owner.view_audience = 'everyone'
         )
       )
   );
@@ -473,6 +497,24 @@ as $$
 $$;
 
 grant execute on function public.clear_expired_profile_notes() to anon, authenticated;
+
+create or replace function public.is_thread_member(thread uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.thread_members tm
+    where tm.thread_id = thread
+      and tm.user_id = auth.uid()
+  );
+$$;
+
+revoke all on function public.is_thread_member(uuid) from public;
+grant execute on function public.is_thread_member(uuid) to authenticated;
 
 alter table public.profiles enable row level security;
 alter table public.friend_requests enable row level security;
@@ -614,12 +656,7 @@ using (user_id = auth.uid());
 drop policy if exists "thread members see threads" on public.message_threads;
 create policy "thread members see threads"
 on public.message_threads for select
-using (
-  exists (
-    select 1 from public.thread_members tm
-    where tm.thread_id = id and tm.user_id = auth.uid()
-  )
-);
+using (public.is_thread_member(message_threads.id));
 
 drop policy if exists "users create threads" on public.message_threads;
 create policy "users create threads"
@@ -635,13 +672,7 @@ with check (created_by = auth.uid());
 drop policy if exists "thread members see members" on public.thread_members;
 create policy "thread members see members"
 on public.thread_members for select
-using (
-  user_id = auth.uid()
-  or exists (
-    select 1 from public.thread_members mine
-    where mine.thread_id = thread_id and mine.user_id = auth.uid()
-  )
-);
+using (public.is_thread_member(thread_members.thread_id));
 
 drop policy if exists "creators add thread members" on public.thread_members;
 create policy "creators add thread members"
@@ -650,7 +681,7 @@ with check (
   user_id = auth.uid()
   or exists (
     select 1 from public.message_threads mt
-    where mt.id = thread_id and mt.created_by = auth.uid()
+    where mt.id = thread_members.thread_id and mt.created_by = auth.uid()
   )
 );
 
@@ -662,23 +693,36 @@ using (user_id = auth.uid());
 drop policy if exists "members read messages" on public.messages;
 create policy "members read messages"
 on public.messages for select
-using (
-  exists (
-    select 1 from public.thread_members tm
-    where tm.thread_id = messages.thread_id and tm.user_id = auth.uid()
-  )
-);
+using (public.is_thread_member(messages.thread_id));
 
 drop policy if exists "members send messages" on public.messages;
 create policy "members send messages"
 on public.messages for insert
 with check (
   sender_id = auth.uid()
-  and exists (
-    select 1 from public.thread_members tm
-    where tm.thread_id = messages.thread_id and tm.user_id = auth.uid()
-  )
+  and public.is_thread_member(messages.thread_id)
 );
+
+create or replace function public.touch_message_thread()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.message_threads
+  set updated_at = now()
+  where id = new.thread_id;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists messages_touch_thread on public.messages;
+create trigger messages_touch_thread
+after insert on public.messages
+for each row
+execute function public.touch_message_thread();
 
 insert into storage.buckets (id, name, public)
 values

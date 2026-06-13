@@ -29,6 +29,7 @@ import {
   type SupabaseSnapshot
 } from "@/lib/supabase/appData";
 import {
+  formatSupabaseAuthError,
   requestEmailChange as requestAuthEmailChange,
   refreshAuthSession,
   signInWithPassword,
@@ -38,8 +39,10 @@ import {
 } from "@/lib/supabase/auth";
 import {
   answerFriendRequest as updateFriendRequestStatus,
+  addThreadMembers,
   createInstant as createRemoteInstant,
   createMessage,
+  createMessageThread,
   createPost as createRemotePost,
   createPostBlip,
   createPostComment,
@@ -51,6 +54,7 @@ import {
   sendFriendRequest,
   updatePost as updateRemotePost,
   updateProfile,
+  updateUserPostsVisibility,
   upsertProfile
 } from "@/lib/supabase/queries";
 import { getConfiguredAccountRole, isSupabaseConfigured } from "@/lib/supabase/config";
@@ -81,6 +85,8 @@ const guestCurrentUser: User = {
   accentColor: "blue",
   isPrivate: false,
   allowExplore: false,
+  viewAudience: "friends",
+  commentAudience: "friends",
   friendIds: [],
   friendRequestsReceived: [],
   friendRequestsSent: [],
@@ -151,7 +157,7 @@ interface AppStateValue {
   getCommentsForPost: (postId: string) => PostComment[] | undefined;
   loadPostComments: (postId: string) => Promise<void>;
   addPostComment: (postId: string, ownerId: string, body: string) => Promise<void>;
-  startThread: (userId: string) => string | null;
+  startThread: (userId: string) => Promise<string | null>;
   sendThreadMessage: (threadId: string, body: string) => Promise<void>;
   replyToInstant: (userId: string, body: string) => Promise<string | null>;
   answerFriendRequest: (requestId: string, status: "accepted" | "ignored") => void;
@@ -191,6 +197,7 @@ interface AppStateValue {
   isFavoriteUser: (userId: string) => boolean;
   isFriend: (userId: string) => boolean;
   isOwner: (userId: string) => boolean;
+  canViewUserPosts: (userId: string) => boolean;
   canInteractWith: (userId: string) => boolean;
   effectiveUser: (user: User) => User;
   setAccentName: (name: AccentName) => void;
@@ -217,6 +224,14 @@ function getAccent(name: AccentName) {
 
 function isRemoteId(id: string) {
   return uuidPattern.test(id);
+}
+
+function viewAudienceFor(user: User) {
+  return user.viewAudience ?? (user.allowExplore && !user.isPrivate ? "everyone" : "friends");
+}
+
+function commentAudienceFor(user: User) {
+  return user.commentAudience ?? "friends";
 }
 
 function makeLocalMessage(currentUserId: string, body: string): ChatMessage {
@@ -399,6 +414,8 @@ async function ensureProfileForSession(
     accent_color: "blue" as const,
     is_private: false,
     allow_explore: true,
+    view_audience: "friends" as const,
+    comment_audience: "friends" as const,
     profile_line: ""
   };
   const profileWithoutRole = {
@@ -410,6 +427,8 @@ async function ensureProfileForSession(
     accent_color: profile.accent_color,
     is_private: profile.is_private,
     allow_explore: profile.allow_explore,
+    view_audience: profile.view_audience,
+    comment_audience: profile.comment_audience,
     profile_line: profile.profile_line
   };
 
@@ -802,6 +821,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       accentColor: accentName,
       isPrivate: isGuest ? false : isPrivate,
       allowExplore: isGuest ? false : allowExplore,
+      viewAudience: profileOverrides.viewAudience ?? viewAudienceFor(baseCurrentUser),
+      commentAudience:
+        profileOverrides.commentAudience ?? commentAudienceFor(baseCurrentUser),
       friendIds: visibleFriendIds,
       stats: {
         ...profileStats,
@@ -961,9 +983,53 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [currentUser.friendIds]
   );
 
+  const canViewUserPosts = useCallback(
+    (userId: string) => {
+      if (isOwner(userId)) {
+        return true;
+      }
+
+      const owner = users.find((user) => user.id === userId);
+      if (!owner) {
+        return false;
+      }
+
+      if (isFriend(userId)) {
+        return true;
+      }
+
+      return !owner.isPrivate && viewAudienceFor(owner) === "everyone";
+    },
+    [isFriend, isOwner, users]
+  );
+
   const canInteractWith = useCallback(
-    (userId: string) => !isGuest && (isOwner(userId) || isFriend(userId)),
-    [isFriend, isGuest, isOwner]
+    (userId: string) => {
+      if (isGuest) {
+        return false;
+      }
+
+      if (isOwner(userId)) {
+        return true;
+      }
+
+      const owner = users.find((user) => user.id === userId);
+      if (!owner) {
+        return false;
+      }
+
+      const audience = commentAudienceFor(owner);
+      if (audience === "none") {
+        return false;
+      }
+
+      if (isFriend(userId)) {
+        return true;
+      }
+
+      return !owner.isPrivate && audience === "everyone";
+    },
+    [isFriend, isGuest, isOwner, users]
   );
 
   const getFriends = useCallback(
@@ -1277,8 +1343,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const startThread = useCallback(
-    (userId: string) => {
-      if (!userId || userId === currentUser.id) {
+    async (userId: string) => {
+      if (!userId || userId === currentUser.id || isGuest) {
         return null;
       }
 
@@ -1290,6 +1356,46 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       if (existingThread) {
         return existingThread.id;
+      }
+
+      if (isRemoteId(currentUser.id) && isRemoteId(userId) && authSession?.access_token) {
+        try {
+          const [remoteThread] = await createMessageThread(
+            currentUser.id,
+            null,
+            false,
+            authSession.access_token
+          );
+
+          if (remoteThread?.id) {
+            await addThreadMembers(
+              remoteThread.id,
+              [
+                { userId: currentUser.id, role: "owner" },
+                { userId, role: "member" }
+              ],
+              authSession.access_token
+            );
+
+            const nextThread: MessageThread = {
+              id: remoteThread.id,
+              participantIds: [currentUser.id, userId],
+              lastMessage: "new conversation",
+              timestamp: "now",
+              unreadCount: 0,
+              messages: []
+            };
+
+            setLocalThreads((items) => [
+              nextThread,
+              ...items.filter((thread) => thread.id !== remoteThread.id)
+            ]);
+
+            return remoteThread.id;
+          }
+        } catch {
+          // Keep the local chat fallback so the UI still opens if Supabase blocks creation.
+        }
       }
 
       const threadId = `local-thread-${currentUser.id}-${userId}-${Date.now()}`;
@@ -1305,7 +1411,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setLocalThreads((items) => [nextThread, ...items]);
       return threadId;
     },
-    [currentUser.id, threads]
+    [authSession?.access_token, currentUser.id, isGuest, threads]
   );
 
   const replyToInstant = useCallback(
@@ -1316,32 +1422,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
 
       const message = `replied to your Instant: ${trimmed}`;
-      const existingThread = threads.find(
-        (thread) =>
-          thread.participantIds.includes(currentUser.id) &&
-          thread.participantIds.includes(userId)
-      );
-
-      if (existingThread) {
-        await sendThreadMessage(existingThread.id, message);
-        return existingThread.id;
+      const threadId = await startThread(userId);
+      if (!threadId) {
+        return null;
       }
 
-      const threadId = `local-thread-${currentUser.id}-${userId}-${Date.now()}`;
-      const localMessage = makeLocalMessage(currentUser.id, message);
-      const nextThread: MessageThread = {
-        id: threadId,
-        participantIds: [currentUser.id, userId],
-        lastMessage: message,
-        timestamp: "now",
-        unreadCount: 0,
-        messages: [localMessage]
-      };
-
-      setLocalThreads((items) => [nextThread, ...items]);
+      await sendThreadMessage(threadId, message);
       return threadId;
     },
-    [currentUser.id, sendThreadMessage, threads]
+    [sendThreadMessage, startThread]
   );
 
   const persistSession = useCallback((session: SupabaseAuthSession) => {
@@ -1358,11 +1447,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       try {
         const session = await signInWithPassword(email, password);
         await ensureProfileForSession(session);
+        const nextSnapshot = await loadSupabaseSnapshot(session.access_token);
+        setSnapshot(nextSnapshot);
         persistSession(session);
-        setSnapshot(await loadSupabaseSnapshot(session.access_token));
       } catch (error) {
         setAuthStatus("idle");
-        setAuthError(error instanceof Error ? error.message : "Could not sign in.");
+        setAuthError(formatSupabaseAuthError(error, "Could not sign in."));
       }
     },
     [persistSession]
@@ -1379,11 +1469,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           username
         });
         await ensureProfileForSession(session, { displayName, username });
+        const nextSnapshot = await loadSupabaseSnapshot(session.access_token);
+        setSnapshot(nextSnapshot);
         persistSession(session);
-        setSnapshot(await loadSupabaseSnapshot(session.access_token));
       } catch (error) {
         setAuthStatus("idle");
-        setAuthError(error instanceof Error ? error.message : "Could not create account.");
+        setAuthError(formatSupabaseAuthError(error, "Could not create account."));
       }
     },
     [persistSession]
@@ -1751,10 +1842,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           accent_color: resolvedUpdates.accentColor,
           is_private: resolvedUpdates.isPrivate,
           allow_explore: resolvedUpdates.allowExplore,
+          view_audience: resolvedUpdates.viewAudience,
+          comment_audience: resolvedUpdates.commentAudience,
           profile_line: resolvedUpdates.location ?? resolvedUpdates.profileLine
         },
         authSession?.access_token
       ).catch(() => undefined);
+
+      if (resolvedUpdates.viewAudience) {
+        await updateUserPostsVisibility(
+          currentUser.id,
+          resolvedUpdates.viewAudience === "everyone" ? "public" : "friends",
+          authSession?.access_token
+        ).catch(() => undefined);
+      }
     },
     [authSession?.access_token, currentUser.id, currentUser.username]
   );
@@ -1881,6 +1982,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       isFavoriteUser,
       isFriend,
       isOwner,
+      canViewUserPosts,
       canInteractWith,
       effectiveUser,
       setAccentName,
@@ -1912,6 +2014,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       isGuest,
       blippedPostIds,
       canInteractWith,
+      canViewUserPosts,
       closeComposer,
       closeInstant,
       composerType,

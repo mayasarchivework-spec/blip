@@ -9,6 +9,8 @@ export type AccentName =
 
 export type PostType = "photo" | "video" | "text" | "song";
 export type AspectRatio = "square" | "portrait" | "landscape" | "free";
+export type ViewAudience = "friends" | "everyone";
+export type CommentAudience = "friends" | "everyone" | "none";
 
 export interface AccentOption {
   name: AccentName;
@@ -39,6 +41,8 @@ export interface User {
   accentColor: AccentName;
   isPrivate: boolean;
   allowExplore: boolean;
+  viewAudience?: ViewAudience;
+  commentAudience?: CommentAudience;
   friendIds: string[];
   friendRequestsReceived: FriendRequest[];
   friendRequestsSent: FriendRequest[];
@@ -68,6 +72,7 @@ export interface Post {
   comments: number;
   isPinned: boolean;
   isHidden?: boolean;
+  visibility?: "friends" | "public";
   createdAt: string;
   aspectRatio?: AspectRatio;
 }

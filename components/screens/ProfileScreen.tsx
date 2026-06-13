@@ -1,6 +1,8 @@
 "use client";
 
 import { EyeOff, Lock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthPanel } from "@/components/AuthPanel";
 import { CreatePostPanel } from "@/components/CreatePostPanel";
@@ -9,8 +11,10 @@ import { ProfileHeader } from "@/components/ProfileHeader";
 import { useAppState } from "@/state/AppState";
 
 export function ProfileScreen({ username }: { username: string }) {
+  const router = useRouter();
   const {
     canInteractWith,
+    canViewUserPosts,
     effectiveUser,
     getUserByUsername,
     authSession,
@@ -20,8 +24,30 @@ export function ProfileScreen({ username }: { username: string }) {
     posts
   } = useAppState();
   const user = getUserByUsername(username);
+  const ownProfileRedirect =
+    !user &&
+    authSession &&
+    currentUser.username !== "guest" &&
+    username !== currentUser.username
+      ? `/profile/${currentUser.username}`
+      : null;
+
+  useEffect(() => {
+    if (ownProfileRedirect) {
+      router.replace(ownProfileRedirect);
+    }
+  }, [ownProfileRedirect, router]);
 
   if (!user) {
+    if (ownProfileRedirect) {
+      return (
+        <div className="screen">
+          <AppHeader title="Profile" brand />
+          <section className="empty-state">Opening your profile...</section>
+        </div>
+      );
+    }
+
     return (
       <div className="screen">
         <AppHeader title="Profile" brand />
@@ -33,7 +59,8 @@ export function ProfileScreen({ username }: { username: string }) {
   const effectiveProfile = effectiveUser(user);
   const ownerProfile = isOwner(user.id);
   const friendProfile = isFriend(user.id);
-  const hiddenPrivate = effectiveProfile.isPrivate && !ownerProfile && !friendProfile;
+  const canViewPosts = canViewUserPosts(user.id);
+  const hiddenPrivate = !canViewPosts;
   const baseUserPosts = posts.filter((post) => post.userId === user.id);
   const visibleBaseUserPosts = baseUserPosts.filter((post) => !post.isHidden);
   const hiddenUserPosts = ownerProfile

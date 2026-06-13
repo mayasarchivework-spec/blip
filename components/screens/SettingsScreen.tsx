@@ -6,16 +6,29 @@ import { type FormEvent, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthPanel } from "@/components/AuthPanel";
 import { SettingsCard, SettingsRow, ToggleSwitch } from "@/components/SettingsCard";
+import type { CommentAudience, ViewAudience } from "@/data/types";
+import { formatSupabaseAuthError } from "@/lib/supabase/auth";
 import { useAppState } from "@/state/AppState";
 
 type SettingsPanel = "sent" | "friends" | "messages" | "email" | "close" | null;
 
-const commentOptions = ["Friends", "Everyone", "No one"];
-const viewOptions = ["Friends", "Everyone"];
+const commentOptions: CommentAudience[] = ["friends", "everyone", "none"];
+const viewOptions: ViewAudience[] = ["friends", "everyone"];
 const requestOptions = ["Everyone", "Friends of friends", "No one"];
 const dmOptions = ["Friends", "Everyone", "No one"];
 
-function nextOption(options: string[], current: string) {
+const commentLabels: Record<CommentAudience, string> = {
+  friends: "Friends",
+  everyone: "Everyone",
+  none: "No one"
+};
+
+const viewLabels: Record<ViewAudience, string> = {
+  friends: "Friends",
+  everyone: "Everyone"
+};
+
+function nextOption<T>(options: T[], current: T) {
   const index = options.indexOf(current);
   return options[(index + 1) % options.length] ?? options[0];
 }
@@ -29,13 +42,12 @@ export function SettingsScreen() {
     currentUser,
     deactivateAccount,
     requestEmailChange,
+    saveProfile,
     setAccentName,
     signOut,
     toggleExplore,
     togglePrivate
   } = useAppState();
-  const [commentAudience, setCommentAudience] = useState("Friends");
-  const [viewAudience, setViewAudience] = useState("Friends");
   const [requestAudience, setRequestAudience] = useState("Everyone");
   const [dmAudience, setDmAudience] = useState("Friends");
   const [storyReplies, setStoryReplies] = useState(true);
@@ -88,9 +100,7 @@ export function SettingsScreen() {
       );
       setEmailInput("");
     } catch (error) {
-      setEmailError(
-        error instanceof Error ? error.message : "Could not request an email change."
-      );
+      setEmailError(formatSupabaseAuthError(error, "Could not request an email change."));
     } finally {
       setAccountBusy(null);
     }
@@ -171,13 +181,19 @@ export function SettingsScreen() {
       <SettingsCard>
         <SettingsRow
           title="Who can comment"
-          value={commentAudience}
-          onClick={() => setCommentAudience((value) => nextOption(commentOptions, value))}
+          value={commentLabels[currentUser.commentAudience ?? "friends"]}
+          onClick={() => {
+            const next = nextOption(commentOptions, currentUser.commentAudience ?? "friends");
+            void saveProfile({ commentAudience: next });
+          }}
         />
         <SettingsRow
           title="Who can view"
-          value={viewAudience}
-          onClick={() => setViewAudience((value) => nextOption(viewOptions, value))}
+          value={viewLabels[currentUser.viewAudience ?? "friends"]}
+          onClick={() => {
+            const next = nextOption(viewOptions, currentUser.viewAudience ?? "friends");
+            void saveProfile({ viewAudience: next });
+          }}
         />
         <SettingsRow
           title="Friend requests received"

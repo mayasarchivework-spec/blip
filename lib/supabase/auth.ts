@@ -50,6 +50,33 @@ export class SupabaseAuthError extends Error {
   }
 }
 
+export function formatSupabaseAuthError(error: unknown, fallback: string) {
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+
+  const rawMessage = error.message.trim();
+  const lowerMessage = rawMessage.toLowerCase();
+
+  if (lowerMessage.includes("error sending confirmation email")) {
+    const redirectTo = getAuthRedirectTo();
+    const redirectHelp = redirectTo
+      ? `Also make sure ${redirectTo} is listed in your Supabase Auth redirect URLs.`
+      : "Also make sure your production Blip URL is listed in your Supabase Auth redirect URLs.";
+
+    return [
+      "Supabase could not send the confirmation email. This usually means the Supabase Auth email sender or SMTP settings need attention.",
+      "Check the sender/from email, SMTP host, port, username, password, and provider verification in Supabase Authentication settings.",
+      redirectHelp,
+      "",
+      "Raw Supabase error:",
+      rawMessage
+    ].join("\n");
+  }
+
+  return rawMessage || fallback;
+}
+
 function authUrl(path: string) {
   assertSupabaseConfig();
   return new URL(`/auth/v1/${path.replace(/^\/+/, "")}`, supabaseUrl).toString();

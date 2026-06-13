@@ -145,6 +145,8 @@ export function buildAppDataset(
       accentColor: profile.accent_color,
       isPrivate: profile.is_private,
       allowExplore: profile.allow_explore,
+      viewAudience: profile.view_audience ?? "friends",
+      commentAudience: profile.comment_audience ?? "friends",
       friendIds: [],
       friendRequestsReceived: [],
       friendRequestsSent: [],
@@ -278,6 +280,7 @@ function mapPostRow(row: PostRow): Post {
     blips: row.blips_count ?? 0,
     comments: row.comments_count ?? 0,
     isPinned: row.is_pinned,
+    visibility: row.visibility,
     createdAt: relativeTime(row.created_at),
     aspectRatio: row.aspect_ratio ?? undefined
   };

@@ -25,6 +25,8 @@ type ProfileUpdate = Partial<
     | "note_expires_at"
     | "profile_line"
     | "username"
+    | "view_audience"
+    | "comment_audience"
   >
 >;
 
@@ -40,7 +42,7 @@ type ProfileInsert = Pick<
   | "allow_explore"
   | "profile_line"
 > &
-  Partial<Pick<ProfileRow, "account_role">>;
+  Partial<Pick<ProfileRow, "account_role" | "view_audience" | "comment_audience">>;
 
 type PostInsert = Pick<
   PostRow,
@@ -175,7 +177,7 @@ export function fetchThreadMembers(accessToken?: string | null) {
     accessToken,
     query: {
       select: "*",
-      order: "created_at.asc"
+      order: "joined_at.asc"
     }
   });
 }
@@ -248,6 +250,21 @@ export function updatePost(
     body: updates,
     query: {
       id: `eq.${postId}`
+    }
+  });
+}
+
+export function updateUserPostsVisibility(
+  userId: string,
+  visibility: PostRow["visibility"],
+  accessToken?: string | null
+) {
+  return supabaseFetch<PostRow[]>("posts", {
+    accessToken,
+    method: "PATCH",
+    body: { visibility },
+    query: {
+      user_id: `eq.${userId}`
     }
   });
 }
@@ -356,6 +373,44 @@ export function createPostComment(
       user_id: userId,
       body
     }
+  });
+}
+
+export function createMessageThread(
+  createdBy: string,
+  title?: string | null,
+  isGroup = false,
+  accessToken?: string | null
+) {
+  return supabaseFetch<MessageThreadRow[]>("message_threads", {
+    accessToken,
+    method: "POST",
+    prefer: "return=representation",
+    body: {
+      created_by: createdBy,
+      title: title ?? null,
+      is_group: isGroup
+    }
+  });
+}
+
+export function addThreadMembers(
+  threadId: string,
+  members: Array<{ userId: string; role?: "owner" | "member" }>,
+  accessToken?: string | null
+) {
+  return supabaseFetch<ThreadMemberRow[]>("thread_members", {
+    accessToken,
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=representation",
+    query: {
+      on_conflict: "thread_id,user_id"
+    },
+    body: members.map((member) => ({
+      thread_id: threadId,
+      user_id: member.userId,
+      role: member.role ?? "member"
+    }))
   });
 }
 

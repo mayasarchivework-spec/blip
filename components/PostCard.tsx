@@ -554,7 +554,7 @@ export function PostCard({
         </div>
       ) : null}
       {!canInteract ? (
-        <div className="interaction-note">Only friends can interact.</div>
+        <div className="interaction-note">This account limits interactions.</div>
       ) : null}
       {commentsOpen ? (
         <div className="comments-drawer">

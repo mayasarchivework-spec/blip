@@ -126,6 +126,7 @@ export function ExploreScreen() {
   const searchParams = useSearchParams();
   const {
     canInteractWith,
+    canViewUserPosts,
     currentUser,
     effectiveUser,
     getUserById,
@@ -174,10 +175,10 @@ export function ExploreScreen() {
           const effectiveOwner = effectiveUser(owner);
           return (
             effectiveOwner.allowExplore &&
-            (!effectiveOwner.isPrivate || isFriend(owner.id) || owner.id === currentUser.id)
+            canViewUserPosts(owner.id)
           );
         }),
-    [currentUser.id, effectiveUser, getUserById, isFriend, posts]
+    [canViewUserPosts, effectiveUser, getUserById, posts]
   );
 
   const tagRows = useMemo(() => {
@@ -201,7 +202,7 @@ export function ExploreScreen() {
 
     return (
       effectiveUserProfile.allowExplore &&
-      (!effectiveUserProfile.isPrivate || isFriend(user.id) || user.id === currentUser.id)
+      canViewUserPosts(user.id)
     );
   });
   const suggestedUsers = visibleExploreUsers
@@ -371,7 +372,7 @@ export function ExploreScreen() {
         <p className="privacy-notice">
           {isGuest
             ? "Browse public Blips. Sign up or sign in to add friends, blip, comment, or share."
-            : "View public profiles and posts. Only friends can interact."}
+            : "View public profiles and posts. Interaction follows each account's comment settings."}
         </p>
       </section>
       {shouldShowPeople ? (

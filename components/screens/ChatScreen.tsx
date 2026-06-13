@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Ban,
   Camera,
@@ -23,8 +24,10 @@ import { VerifiedName } from "@/components/VerifiedName";
 import { useAppState } from "@/state/AppState";
 
 export function ChatScreen({ threadId }: { threadId: string }) {
+  const router = useRouter();
   const {
     currentUser,
+    getInstantForUser,
     getUserById,
     isFavoriteUser,
     openInstant,
@@ -58,7 +61,17 @@ export function ChatScreen({ threadId }: { threadId: string }) {
     return null;
   }
 
-  const favorite = isFavoriteUser(otherUser.id);
+  const chatUser = otherUser;
+  const favorite = isFavoriteUser(chatUser.id);
+
+  function openInstantOrProfile() {
+    if (getInstantForUser(chatUser.id)) {
+      openInstant(chatUser.id);
+      return;
+    }
+
+    router.push(`/profile/${chatUser.username}`);
+  }
 
   return (
     <div className="screen chat-screen">
@@ -66,17 +79,17 @@ export function ChatScreen({ threadId }: { threadId: string }) {
         <Link href="/messages" className="back-link" aria-label="Back to messages">
           <ChevronLeft size={30} />
         </Link>
-        <AvatarRing user={otherUser} size="sm" onClick={() => openInstant(otherUser.id)} />
+        <AvatarRing user={chatUser} size="sm" onClick={openInstantOrProfile} />
         <div className="chat-title">
           <strong>
-            <VerifiedName user={otherUser} />
+            <VerifiedName user={chatUser} />
           </strong>
-          <span>@{otherUser.username}</span>
+          <span>@{chatUser.username}</span>
         </div>
         <button
           type="button"
           aria-label="Favorite"
-          onClick={() => toggleFavoriteUser(otherUser.id)}
+          onClick={() => toggleFavoriteUser(chatUser.id)}
         >
           <Star size={24} fill={favorite ? "currentColor" : "none"} />
         </button>
@@ -96,7 +109,7 @@ export function ChatScreen({ threadId }: { threadId: string }) {
                 type="button"
                 onClick={() => {
                   if (label === "Remove friend") {
-                    removeFriend(otherUser.id);
+                    removeFriend(chatUser.id);
                   }
                   setInfoMessage(label.toLowerCase());
                   window.setTimeout(() => setInfoMessage(""), 1200);
@@ -110,7 +123,7 @@ export function ChatScreen({ threadId }: { threadId: string }) {
           </div>
         ) : null}
       </header>
-      <div className="chat-hint">tap profile photo to view their Instant</div>
+      <div className="chat-hint">tap profile photo to view their Instant or profile</div>
       <section className="chat-messages">
         <div className="day-divider">Today</div>
         {thread.messages.map((message) => {

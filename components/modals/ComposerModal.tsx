@@ -8,6 +8,7 @@ import {
   Hash,
   ImagePlus,
   MessageCircle,
+  Play,
   Sparkles,
   Users,
   Video,
@@ -27,8 +28,6 @@ const iconMap = {
   video: Video
 };
 
-const fallbackPhoto = "/assets/photo-selfie.svg";
-const fallbackVideo = "/assets/photo-car-night.svg";
 const replyModes = ["Friends", "Everyone", "No replies"] as const;
 
 function formatHashtags(value: string) {
@@ -49,6 +48,89 @@ function isVisualComposer(type: ComposerType): type is "photo" | "video" {
   return type === "photo" || type === "video";
 }
 
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
+function captureVideoThumbnail(src: string) {
+  return new Promise<string>((resolve, reject) => {
+    const video = document.createElement("video");
+    let timeoutId = 0;
+    let finished = false;
+
+    function settle(callback: () => void) {
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+      window.clearTimeout(timeoutId);
+      callback();
+    }
+
+    function capture() {
+      const width = video.videoWidth || 1080;
+      const height = video.videoHeight || 1920;
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        settle(() => reject(new Error("Could not prepare the video thumbnail.")));
+        return;
+      }
+
+      const maxSide = 960;
+      const scale = Math.min(1, maxSide / Math.max(width, height));
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      settle(() => resolve(canvas.toDataURL("image/jpeg", 0.86)));
+    }
+
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    video.onloadeddata = () => {
+      const seekTarget =
+        Number.isFinite(video.duration) && video.duration > 0.35
+          ? Math.min(0.35, video.duration / 4)
+          : 0;
+
+      if (seekTarget > 0) {
+        const fallbackId = window.setTimeout(capture, 700);
+        video.onseeked = () => {
+          window.clearTimeout(fallbackId);
+          capture();
+        };
+
+        try {
+          video.currentTime = seekTarget;
+        } catch {
+          window.clearTimeout(fallbackId);
+          capture();
+        }
+        return;
+      }
+
+      capture();
+    };
+    video.onerror = () =>
+      settle(() => reject(new Error("Could not load this video for a thumbnail.")));
+    timeoutId = window.setTimeout(
+      () => settle(() => reject(new Error("Video thumbnail timed out."))),
+      5000
+    );
+    video.src = src;
+    video.load();
+  });
+}
+
 export function ComposerModal() {
   const { addLocalPost, composerType, closeComposer, currentUser } = useAppState();
   const [caption, setCaption] = useState("");
@@ -56,6 +138,8 @@ export function ComposerModal() {
   const [text, setText] = useState("");
   const [replyMode, setReplyMode] = useState<(typeof replyModes)[number]>("Friends");
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [videoThumbnailUrl, setVideoThumbnailUrl] = useState("");
+  const [videoThumbnailStatus, setVideoThumbnailStatus] = useState("");
   const [posted, setPosted] = useState(false);
   const textPreview = text.trim() || "What's happening on Blip?";
   const textCount = text.length;
@@ -70,38 +154,50 @@ export function ComposerModal() {
 
   const Icon = iconMap[composerType];
   const isVisual = isVisualComposer(composerType);
-  const previewUrl = mediaUrls[0] || (composerType === "video" ? fallbackVideo : fallbackPhoto);
+  const previewUrl = mediaUrls[0] ?? "";
   const visualUrls =
     composerType === "photo"
-      ? (mediaUrls.length ? mediaUrls : [fallbackPhoto]).slice(0, 20)
-      : [previewUrl];
-  const isUploadedVideo = composerType === "video" && previewUrl.startsWith("data:video");
+      ? mediaUrls.slice(0, 20)
+      : previewUrl
+        ? [previewUrl]
+        : [];
+  const isMakingVideoThumbnail = videoThumbnailStatus === "Making thumbnail...";
 
-  function chooseFiles(fileList: FileList | null) {
+  async function chooseFiles(fileList: FileList | null) {
     const files = Array.from(fileList ?? []).slice(0, composerType === "photo" ? 20 : 1);
 
     if (!files.length) {
       return;
     }
 
-    Promise.all(
-      files.map(
-        (file) =>
-          new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-            reader.onerror = () => resolve("");
-            reader.readAsDataURL(file);
-          })
-      )
-    ).then((urls) => {
-      const cleanUrls = urls.filter(Boolean);
-      setMediaUrls((current) =>
-        composerType === "photo"
-          ? [...current, ...cleanUrls].slice(0, 20)
-          : cleanUrls.slice(0, 1)
-      );
-    });
+    if (composerType === "video") {
+      const videoUrl = await readFileAsDataUrl(files[0]);
+      setMediaUrls(videoUrl ? [videoUrl] : []);
+      setVideoThumbnailUrl("");
+
+      if (!videoUrl) {
+        setVideoThumbnailStatus("Could not load video");
+        return;
+      }
+
+      setVideoThumbnailStatus("Making thumbnail...");
+
+      try {
+        setVideoThumbnailUrl(await captureVideoThumbnail(videoUrl));
+        setVideoThumbnailStatus("");
+      } catch {
+        setVideoThumbnailStatus("Preview ready");
+      }
+
+      return;
+    }
+
+    setVideoThumbnailUrl("");
+    setVideoThumbnailStatus("");
+
+    const urls = await Promise.all(files.map((file) => readFileAsDataUrl(file)));
+    const cleanUrls = urls.filter(Boolean);
+    setMediaUrls((current) => [...current, ...cleanUrls].slice(0, 20));
   }
 
   function removeImage(index: number) {
@@ -115,7 +211,7 @@ export function ComposerModal() {
       addLocalPost({
         type: composerType,
         content: finalCaption || (composerType === "photo" ? "new photo" : "new video"),
-        imageUrl: previewUrl,
+        imageUrl: composerType === "video" ? videoThumbnailUrl || undefined : previewUrl,
         imageUrls: composerType === "photo" ? visualUrls : undefined,
         videoUrl: composerType === "video" ? previewUrl : undefined,
         caption: finalCaption || undefined
@@ -137,7 +233,7 @@ export function ComposerModal() {
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="composer-modal">
+      <div className={`composer-modal composer-modal-${composerType}`}>
         <button className="modal-close" type="button" onClick={closeComposer}>
           <X size={22} />
         </button>
@@ -148,8 +244,33 @@ export function ComposerModal() {
         {isVisual ? (
           <div className="composer-body">
             <div className="composer-preview">
-              {isUploadedVideo ? (
-                <video src={previewUrl} controls playsInline preload="metadata" />
+              {!mediaUrls.length ? (
+                <label className="composer-upload-empty">
+                  <ImagePlus size={26} />
+                  <span>Upload {composerType === "photo" ? "images" : "a video"}</span>
+                  <small>{composerType === "photo" ? "up to 20 images" : "thumbnail made for you"}</small>
+                  <input
+                    type="file"
+                    accept={composerType === "photo" ? "image/*" : "video/*"}
+                    multiple={composerType === "photo"}
+                    onChange={(event) => chooseFiles(event.target.files)}
+                  />
+                </label>
+              ) : composerType === "video" ? (
+                <div className="composer-video-poster">
+                  {videoThumbnailUrl ? (
+                    <img src={videoThumbnailUrl} alt="" />
+                  ) : (
+                    <video src={previewUrl} muted playsInline preload="metadata" />
+                  )}
+                  <span className="composer-play composer-play-clean">
+                    <Play size={28} fill="currentColor" />
+                  </span>
+                  <span className="composer-preview-pill">Video</span>
+                  {videoThumbnailStatus ? (
+                    <span className="composer-video-status">{videoThumbnailStatus}</span>
+                  ) : null}
+                </div>
               ) : composerType === "photo" && visualUrls.length > 1 ? (
                 <div className="multi-image-strip">
                   {visualUrls.map((url, index) => (
@@ -162,11 +283,6 @@ export function ComposerModal() {
               {composerType === "photo" && visualUrls.length > 1 ? (
                 <span className="multi-image-count">{visualUrls.length}/20</span>
               ) : null}
-              {composerType === "video" ? (
-                <span className="composer-play">
-                  <Video size={30} />
-                </span>
-              ) : null}
             </div>
             <div className="composer-choice-row">
               <label className="mini-action accept">
@@ -174,7 +290,7 @@ export function ComposerModal() {
                 <span>Upload</span>
                 <input
                   type="file"
-                  accept={composerType === "photo" ? "image/*" : "video/*,image/*"}
+                  accept={composerType === "photo" ? "image/*" : "video/*"}
                   multiple={composerType === "photo"}
                   onChange={(event) => chooseFiles(event.target.files)}
                 />
@@ -283,9 +399,11 @@ export function ComposerModal() {
           <BlipButton
             type="button"
             onClick={postDraft}
-            disabled={!isVisual && !text.trim()}
+            disabled={
+              (isVisual && !mediaUrls.length) || isMakingVideoThumbnail || (!isVisual && !text.trim())
+            }
           >
-            {posted ? "Posted" : "Post"}
+            {posted ? "Posted" : isMakingVideoThumbnail ? "Preparing" : "Post"}
           </BlipButton>
         </div>
       </div>

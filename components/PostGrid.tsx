@@ -15,13 +15,15 @@ interface PostGridProps {
   canInteract?: (post: Post) => boolean;
   showOwner?: boolean;
   showPinnedLabels?: boolean;
+  showHiddenLabels?: boolean;
 }
 
 export function PostGrid({
   posts,
   canInteract,
   showOwner = false,
-  showPinnedLabels = false
+  showPinnedLabels = false,
+  showHiddenLabels = false
 }: PostGridProps) {
   const { blipPost, getUserById, hasBlipped } = useAppState();
   const [expandedPost, setExpandedPost] = useState<Post | null>(null);
@@ -57,6 +59,7 @@ export function PostGrid({
               <div className="tile-labels">
                 <span>{post.type}</span>
                 {showPinnedLabels && post.isPinned ? <span>Pinned</span> : null}
+                {showHiddenLabels && post.isHidden ? <span>Hidden</span> : null}
               </div>
               <PostContent post={post} compact />
               {showOwner && owner ? (

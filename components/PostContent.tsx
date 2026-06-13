@@ -83,6 +83,51 @@ function MediaCarousel({ images, label }: MediaCarouselProps) {
   );
 }
 
+interface VideoPreviewProps {
+  label: string;
+  poster?: string;
+  src: string;
+}
+
+function VideoPreview({ label, poster, src }: VideoPreviewProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  if (isPlaying) {
+    return (
+      <video
+        src={src}
+        poster={poster}
+        controls
+        autoPlay
+        playsInline
+        preload="metadata"
+        onClick={(event) => event.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="clean-video-preview"
+      onClick={(event) => {
+        event.stopPropagation();
+        setIsPlaying(true);
+      }}
+      aria-label={`Play ${label}`}
+    >
+      {poster ? (
+        <img src={poster} alt={label} />
+      ) : (
+        <video src={src} muted playsInline preload="metadata" />
+      )}
+      <span className="video-play video-play-clean">
+        <Play size={42} fill="currentColor" />
+      </span>
+    </button>
+  );
+}
+
 export function PostContent({ post, compact = false }: PostContentProps) {
   const images = cleanImageUrls(
     post.imageUrls?.length ? post.imageUrls : [post.imageUrl]
@@ -110,8 +155,8 @@ export function PostContent({ post, compact = false }: PostContentProps) {
         images.length > 1 ? "media-frame-multiple" : ""
       }`}
     >
-      {post.type === "video" && post.videoUrl?.startsWith("data:video") ? (
-        <video src={post.videoUrl} poster={images[0] ?? post.imageUrl} controls playsInline preload="metadata" />
+      {post.type === "video" && post.videoUrl ? (
+        <VideoPreview src={post.videoUrl} poster={images[0] ?? post.imageUrl} label={mediaLabel} />
       ) : images.length > 1 ? (
         <MediaCarousel images={images} label={mediaLabel} />
       ) : images[0] ? (

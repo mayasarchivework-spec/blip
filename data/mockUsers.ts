@@ -44,7 +44,7 @@ export const mockUsers: User[] = [
     friendRequestsSent: [],
     stats: { posts: 75, friends: 96, blips: 141 },
     profileLine: "nyc - dreaming - music - friends",
-    note: "blue theme"
+    note: "good times"
   },
   {
     id: "user-jules",

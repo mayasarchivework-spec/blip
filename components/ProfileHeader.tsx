@@ -18,7 +18,6 @@ import { useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
 import { RichText } from "@/components/RichText";
-import { ThinkingDots } from "@/components/ThinkingDots";
 import { VerifiedName } from "@/components/VerifiedName";
 import type { User } from "@/data/types";
 import { copyToClipboard } from "@/lib/copyToClipboard";
@@ -36,7 +35,6 @@ export function ProfileHeader({
   isFriendProfile
 }: ProfileHeaderProps) {
   const {
-    accent,
     currentUser,
     getUserById,
     hasRequested,
@@ -64,7 +62,7 @@ export function ProfileHeader({
   const profileFriends = user.friendIds
     .map((friendId) => getUserById(friendId))
     .filter((friend): friend is User => Boolean(friend));
-  const profilePosts = posts.filter((post) => post.userId === user.id);
+  const profilePosts = posts.filter((post) => post.userId === user.id && !post.isHidden);
   const topBlipPosts = [...profilePosts].sort((a, b) => b.blips - a.blips).slice(0, 6);
   const loadedPostBlips = profilePosts.reduce((total, post) => total + post.blips, 0);
   const profileBlipTotal = Math.max(user.stats.blips, loadedPostBlips);
@@ -192,8 +190,12 @@ export function ProfileHeader({
   }
 
   return (
-    <section className={`profile-card ${user.bannerUrl ? "profile-card-with-banner" : ""}`}>
-      {user.bannerUrl ? <img className="profile-banner" src={user.bannerUrl} alt="" /> : null}
+    <section className="profile-card profile-card-with-banner">
+      {user.bannerUrl ? (
+        <img className="profile-banner" src={user.bannerUrl} alt="" />
+      ) : (
+        <span className="profile-banner profile-banner-placeholder" aria-hidden="true" />
+      )}
       <div className="profile-top">
         <AvatarRing user={user} size="xl" onClick={() => openInstant(user.id)} />
         <div className="profile-copy">
@@ -220,19 +222,12 @@ export function ProfileHeader({
           ) : null}
           {user.note ? (
             <div className="profile-note-bubble">
-              <ThinkingDots compact />
               <span>
                 <RichText text={user.note} />
               </span>
             </div>
           ) : null}
         </div>
-        {isOwnerProfile ? (
-          <div className="theme-chip">
-            <span>{accent.label} theme</span>
-            <i />
-          </div>
-        ) : null}
       </div>
       <div className="profile-stats">
         <div>

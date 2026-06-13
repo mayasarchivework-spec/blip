@@ -81,6 +81,8 @@ interface StoredAppState {
   postEditOverrides?: Record<string, Partial<Post>>;
   pinnedPostOverrides?: Record<string, boolean>;
   blippedPostIds?: string[];
+  hiddenPostIds?: string[];
+  deletedPostIds?: string[];
   localPosts?: Post[];
   localInstants?: Instant[];
   localThreads?: MessageThread[];
@@ -430,6 +432,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
   const [blippedPostIds, setBlippedPostIds] = useState<string[]>([]);
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([]);
+  const [deletedPostIds, setDeletedPostIds] = useState<string[]>([]);
   const [localPosts, setLocalPosts] = useState<Post[]>([]);
   const [localInstants, setLocalInstants] = useState<Instant[]>([]);
   const [localThreads, setLocalThreads] = useState<MessageThread[]>([]);
@@ -535,6 +538,27 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty("--accent-color", accent.color);
     root.style.setProperty("--accent-dark", accent.dark);
     root.style.setProperty("--accent-light", accent.light);
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent.light}"/><stop offset=".52" stop-color="${accent.color}"/><stop offset="1" stop-color="${accent.dark}"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M19 21h25a9 9 0 0 1 0 18H19" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M19 35h23a8 8 0 0 1 0 16H31" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M17 50a13 13 0 0 1 13-13" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><circle cx="18" cy="50" r="5" fill="#fff"/></svg>`;
+    const href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    const existingIconLinks = Array.from(
+      document.querySelectorAll<HTMLLinkElement>(
+        'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
+      )
+    );
+    const iconLinks = existingIconLinks.length
+      ? existingIconLinks
+      : [document.createElement("link")];
+
+    iconLinks.forEach((link, index) => {
+      link.rel = link.rel || (index === 0 ? "icon" : "shortcut icon");
+      link.type = "image/svg+xml";
+      link.href = href;
+
+      if (!link.parentElement) {
+        document.head.appendChild(link);
+      }
+    });
   }, [accent]);
 
   useEffect(() => {
@@ -582,6 +606,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
       if (Array.isArray(stored.blippedPostIds)) {
         setBlippedPostIds(stored.blippedPostIds);
+      }
+      if (Array.isArray(stored.hiddenPostIds)) {
+        setHiddenPostIds(stored.hiddenPostIds);
+      }
+      if (Array.isArray(stored.deletedPostIds)) {
+        setDeletedPostIds(stored.deletedPostIds);
       }
       if (Array.isArray(stored.localPosts)) {
         setLocalPosts(stored.localPosts);
@@ -659,6 +689,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       postEditOverrides,
       pinnedPostOverrides,
       blippedPostIds,
+      hiddenPostIds,
+      deletedPostIds,
       localPosts,
       localInstants,
       localThreads,
@@ -681,6 +713,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     editorAdjustments,
     editorFilter,
     favoriteUserIds,
+    deletedPostIds,
+    hiddenPostIds,
     isPrivate,
     localInstants,
     localThreads,
@@ -786,18 +820,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const posts = useMemo(
     () =>
       [...(isGuest ? [] : localPosts), ...dataset.posts]
-        .filter((post) => post.type !== "song" && !hiddenPostIds.includes(post.id))
+        .filter((post) => post.type !== "song" && !deletedPostIds.includes(post.id))
         .map((post) => ({
           ...post,
           ...postEditOverrides[post.id],
           blips: blipOverrides[post.id] ?? post.blips,
           comments: commentOverrides[post.id] ?? post.comments,
-          isPinned: pinnedPostOverrides[post.id] ?? post.isPinned
+          isPinned: pinnedPostOverrides[post.id] ?? post.isPinned,
+          isHidden: hiddenPostIds.includes(post.id)
         })),
     [
       blipOverrides,
       commentOverrides,
       dataset.posts,
+      deletedPostIds,
       hiddenPostIds,
       isGuest,
       localPosts,
@@ -1458,7 +1494,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const deletePost = useCallback((postId: string) => {
     setLocalPosts((items) => items.filter((post) => post.id !== postId));
-    setHiddenPostIds((ids) => (ids.includes(postId) ? ids : [...ids, postId]));
+    setDeletedPostIds((ids) => (ids.includes(postId) ? ids : [...ids, postId]));
+    setHiddenPostIds((ids) => ids.filter((id) => id !== postId));
 
     if (!isRemoteId(postId)) {
       return;
@@ -1468,7 +1505,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, [authSession?.access_token]);
 
   const hidePost = useCallback((postId: string) => {
-    setHiddenPostIds((ids) => (ids.includes(postId) ? ids : [...ids, postId]));
+    setHiddenPostIds((ids) =>
+      ids.includes(postId) ? ids.filter((id) => id !== postId) : [...ids, postId]
+    );
   }, []);
 
   const pinPost = useCallback(

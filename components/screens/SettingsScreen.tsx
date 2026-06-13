@@ -69,8 +69,8 @@ export function SettingsScreen() {
             <h2>Accent color / theme</h2>
             <p>Choose your Blip accent color.</p>
           </div>
-          <span className="current-color">
-            {accent.label} <i />
+          <span className="current-color" aria-label="Current accent color">
+            <i />
           </span>
         </div>
         <div className="swatch-row">

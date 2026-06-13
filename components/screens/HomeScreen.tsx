@@ -15,10 +15,10 @@ export function HomeScreen() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const friends = getFriends();
   const friendPosts = posts
-    .filter((post) => currentUser.friendIds.includes(post.userId))
+    .filter((post) => currentUser.friendIds.includes(post.userId) && !post.isHidden)
     .slice()
     .sort((a, b) => Number(b.isPinned) - Number(a.isPinned));
-  const ownPosts = posts.filter((post) => post.userId === currentUser.id);
+  const ownPosts = posts.filter((post) => post.userId === currentUser.id && !post.isHidden);
   const request = currentUser.friendRequestsReceived.find(
     (item) => item.status !== "ignored"
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { EyeOff, Lock } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthPanel } from "@/components/AuthPanel";
 import { CreatePostPanel } from "@/components/CreatePostPanel";
@@ -35,18 +35,25 @@ export function ProfileScreen({ username }: { username: string }) {
   const friendProfile = isFriend(user.id);
   const hiddenPrivate = effectiveProfile.isPrivate && !ownerProfile && !friendProfile;
   const baseUserPosts = posts.filter((post) => post.userId === user.id);
+  const visibleBaseUserPosts = baseUserPosts.filter((post) => !post.isHidden);
+  const hiddenUserPosts = ownerProfile
+    ? baseUserPosts
+        .filter((post) => post.isHidden)
+        .slice()
+        .sort((a, b) => Number(b.isPinned) - Number(a.isPinned))
+    : [];
   const pinnedPhotoIds = new Set(
-    baseUserPosts
+    visibleBaseUserPosts
       .filter((post) => post.isPinned && post.type === "photo")
       .slice(0, 3)
       .map((post) => post.id)
   );
   const userPosts = ownerProfile
     ? [
-        ...baseUserPosts.filter((post) => pinnedPhotoIds.has(post.id)),
-        ...baseUserPosts.filter((post) => !pinnedPhotoIds.has(post.id))
+        ...visibleBaseUserPosts.filter((post) => pinnedPhotoIds.has(post.id)),
+        ...visibleBaseUserPosts.filter((post) => !pinnedPhotoIds.has(post.id))
       ]
-    : baseUserPosts;
+    : visibleBaseUserPosts;
 
   if (!authSession && username === currentUser.username) {
     return (
@@ -73,18 +80,37 @@ export function ProfileScreen({ username }: { username: string }) {
           <p>Become friends to see their posts.</p>
         </section>
       ) : (
-        userPosts.length ? (
-          <PostGrid
-            posts={userPosts}
-            canInteract={(post) => canInteractWith(post.userId)}
-            showPinnedLabels={ownerProfile}
-          />
-        ) : (
-          <section className="empty-state">
-            <h2>No posts yet.</h2>
-            <p>This profile is ready for its first Blip.</p>
-          </section>
-        )
+        <>
+          {userPosts.length ? (
+            <PostGrid
+              posts={userPosts}
+              canInteract={(post) => canInteractWith(post.userId)}
+              showPinnedLabels={ownerProfile}
+            />
+          ) : hiddenUserPosts.length ? null : (
+            <section className="empty-state">
+              <h2>No posts yet.</h2>
+              <p>This profile is ready for its first Blip.</p>
+            </section>
+          )}
+          {ownerProfile && hiddenUserPosts.length ? (
+            <section className="hidden-posts-panel">
+              <div className="hidden-posts-head">
+                <EyeOff size={22} />
+                <div>
+                  <h2>Hidden posts</h2>
+                  <p>Open a post and use the menu to unhide it.</p>
+                </div>
+              </div>
+              <PostGrid
+                posts={hiddenUserPosts}
+                canInteract={(post) => canInteractWith(post.userId)}
+                showPinnedLabels
+                showHiddenLabels
+              />
+            </section>
+          ) : null}
+        </>
       )}
     </div>
   );

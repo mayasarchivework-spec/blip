@@ -67,6 +67,7 @@ export interface Post {
   blips: number;
   comments: number;
   isPinned: boolean;
+  isHidden?: boolean;
   createdAt: string;
   aspectRatio?: AspectRatio;
 }

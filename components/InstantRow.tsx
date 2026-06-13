@@ -5,7 +5,6 @@ import { Camera, FileText, Video, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
-import { ThinkingDots } from "@/components/ThinkingDots";
 import { VerifiedName } from "@/components/VerifiedName";
 import type { User } from "@/data/types";
 import { useAppState } from "@/state/AppState";
@@ -89,7 +88,6 @@ export function InstantRow({ users, includeCurrent = false, notes = false }: Ins
                   className={`instant-note ${current ? "instant-note-own" : ""}`}
                   onClick={() => (current ? setNoteCreatorOpen(true) : setExpandedNote(user))}
                 >
-                  <ThinkingDots compact />
                   <span>{note || (current ? "add a note" : "thinking")}</span>
                 </button>
               ) : null}

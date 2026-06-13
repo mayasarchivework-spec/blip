@@ -145,7 +145,8 @@ export function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState(tagParam);
   const normalizedQuery = normalizeSearch(searchQuery);
-  const activeTag = selectedTag || (searchQuery.trim().startsWith("#") ? normalizedQuery : "");
+  const tagSearch = searchQuery.trim().startsWith("#");
+  const activeTag = selectedTag || (tagSearch ? normalizedQuery : "");
 
   useEffect(() => {
     if (tagParam) {
@@ -161,7 +162,11 @@ export function ExploreScreen() {
           const owner = getUserById(post.userId);
           return { post, owner };
         })
-        .filter(({ owner }) => {
+        .filter(({ post, owner }) => {
+          if (post.isHidden) {
+            return false;
+          }
+
           if (!owner) {
             return false;
           }
@@ -190,8 +195,9 @@ export function ExploreScreen() {
       .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
   }, [normalizedQuery, publicPostPool]);
 
+  const showFullPeopleResults = activeCategory === "People" || Boolean(normalizedQuery);
   const suggestedUsers = users
-    .filter((user) => user.id !== currentUser.id && !isFriend(user.id))
+    .filter((user) => showFullPeopleResults || (user.id !== currentUser.id && !isFriend(user.id)))
     .filter((user) => !normalizedQuery || userSearchText(user).includes(normalizedQuery));
 
   const publicPosts = publicPostPool
@@ -235,10 +241,13 @@ export function ExploreScreen() {
     .map(({ post }) => post);
 
   const shouldShowPeople =
-    activeCategory === "For you" || activeCategory === "People";
+    activeCategory === "For you" || activeCategory === "People" || (Boolean(normalizedQuery) && !tagSearch);
   const shouldShowPosts =
-    activeCategory === "For you" || activeCategory === "Posts" || activeCategory === "Tags";
-  const shouldShowTags = activeCategory === "Tags" || activeCategory === "For you";
+    activeCategory === "For you" ||
+    activeCategory === "Posts" ||
+    activeCategory === "Tags" ||
+    Boolean(normalizedQuery);
+  const shouldShowTags = activeCategory === "Tags" || activeCategory === "For you" || tagSearch;
 
   function toggleFilter(filter: ExploreFilter) {
     setActiveFilters((filters) =>
@@ -370,6 +379,7 @@ export function ExploreScreen() {
           <div className={activeCategory === "People" ? "people-grid" : "people-scroll"}>
             {suggestedUsers.length ? (
               suggestedUsers.slice(0, activeCategory === "People" ? 24 : 6).map((user) => {
+                const ownProfile = user.id === currentUser.id;
                 const requested = hasRequested(user.id);
                 return (
                   <div key={user.id} className="suggested-person">
@@ -382,10 +392,16 @@ export function ExploreScreen() {
                     </Link>
                     <BlipButton
                       type="button"
-                      disabled={isGuest || requested}
+                      disabled={ownProfile || isGuest || requested}
                       onClick={() => requestFriend(user.id)}
                     >
-                      {isGuest ? "Sign in to add" : requested ? "Request sent" : "Add friend"}
+                      {ownProfile
+                        ? "Your profile"
+                        : isGuest
+                          ? "Sign in to add"
+                          : requested
+                            ? "Request sent"
+                            : "Add friend"}
                     </BlipButton>
                   </div>
                 );

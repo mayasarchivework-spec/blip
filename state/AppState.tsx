@@ -70,6 +70,25 @@ const noteLifetimeMs = 24 * 60 * 60 * 1000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const dataUrlPrefix = "data:";
+const guestCurrentUser: User = {
+  id: "guest",
+  username: "guest",
+  displayName: "Guest",
+  accountRole: "user",
+  bio: "",
+  avatarUrl: "/assets/avatar-racer.svg",
+  accentColor: "blue",
+  isPrivate: false,
+  allowExplore: false,
+  friendIds: [],
+  friendRequestsReceived: [],
+  friendRequestsSent: [],
+  stats: {
+    posts: 0,
+    friends: 0,
+    blips: 0
+  }
+};
 
 interface StoredAppState {
   accentName?: AccentName;
@@ -487,11 +506,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
   const isGuest = !authSession;
   const baseCurrentUser = useMemo(
-    () =>
-      dataset.users.find((user) => user.id === dataset.currentUserId) ??
-      dataset.users.find((user) => user.username === "racer") ??
-      mockCurrentUser,
-    [dataset.currentUserId, dataset.users, mockCurrentUser]
+    () => {
+      if (isGuest) {
+        return guestCurrentUser;
+      }
+
+      return (
+        dataset.users.find((user) => user.id === dataset.currentUserId) ??
+        mockCurrentUser
+      );
+    },
+    [dataset.currentUserId, dataset.users, isGuest, mockCurrentUser]
   );
 
   const accent = useMemo(() => getAccent(accentName), [accentName]);
@@ -773,8 +798,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       ...baseCurrentUser,
       ...profileOverrides,
       accentColor: accentName,
-      isPrivate,
-      allowExplore,
+      isPrivate: isGuest ? false : isPrivate,
+      allowExplore: isGuest ? false : allowExplore,
       friendIds: visibleFriendIds,
       stats: {
         ...profileStats,
@@ -805,6 +830,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     dataset.source,
     hiddenRequestIds,
     isPrivate,
+    isGuest,
     profileOverrides,
     requestedUserIds,
     removedFriendIds,

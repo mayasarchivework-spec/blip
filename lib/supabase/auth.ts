@@ -20,10 +20,34 @@ interface AuthResponse extends Omit<SupabaseAuthSession, "expires_at"> {
 }
 
 interface AuthErrorResponse {
+  code?: string;
   error?: string;
+  error_code?: string;
   error_description?: string;
   msg?: string;
   message?: string;
+}
+
+export class SupabaseAuthError extends Error {
+  readonly code?: string;
+  readonly status: number;
+
+  constructor({
+    code,
+    details,
+    message,
+    status
+  }: {
+    code?: string;
+    details?: string;
+    message: string;
+    status: number;
+  }) {
+    super(details ? `${message}\n${details}` : message);
+    this.name = "SupabaseAuthError";
+    this.code = code;
+    this.status = status;
+  }
 }
 
 function authUrl(path: string) {
@@ -31,13 +55,62 @@ function authUrl(path: string) {
   return new URL(`/auth/v1/${path.replace(/^\/+/, "")}`, supabaseUrl).toString();
 }
 
-function redirectToApp() {
-  const origin =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_SITE_URL ?? "";
+function siteOrigin() {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
-  return origin ? `${origin.replace(/\/+$/, "")}/home` : undefined;
+  if (configuredSiteUrl) {
+    return configuredSiteUrl;
+  }
+
+  return typeof window !== "undefined" ? window.location.origin : "";
+}
+
+export function getAuthRedirectTo() {
+  const origin = siteOrigin();
+
+  if (!origin) {
+    return undefined;
+  }
+
+  try {
+    return new URL("/home", origin).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+async function buildAuthError(response: Response) {
+  const bodyText = await response.text();
+  let parsed: AuthErrorResponse = {};
+
+  if (bodyText) {
+    try {
+      parsed = JSON.parse(bodyText) as AuthErrorResponse;
+    } catch {
+      parsed = {};
+    }
+  }
+
+  const message =
+    (parsed.error_description ??
+      parsed.message ??
+      parsed.msg ??
+      parsed.error ??
+      bodyText.trim()) ||
+    `Supabase Auth request failed: ${response.status}`;
+  const code = parsed.code ?? parsed.error_code ?? parsed.error;
+  const detailParts = [
+    `Supabase status: ${response.status}`,
+    code ? `Supabase code: ${code}` : "",
+    parsed.error && parsed.error !== message ? `Supabase error: ${parsed.error}` : ""
+  ].filter(Boolean);
+
+  return new SupabaseAuthError({
+    code,
+    details: detailParts.join("\n"),
+    message,
+    status: response.status
+  });
 }
 
 async function authFetch<T>(path: string, init: RequestInit = {}) {
@@ -51,14 +124,7 @@ async function authFetch<T>(path: string, init: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    const error = (await response.json().catch(() => ({}))) as AuthErrorResponse;
-    throw new Error(
-      error.error_description ??
-        error.message ??
-        error.msg ??
-        error.error ??
-        `Supabase Auth request failed: ${response.status}`
-    );
+    throw await buildAuthError(response);
   }
 
   return (await response.json()) as T;
@@ -85,7 +151,7 @@ export async function signUpWithPassword(
   password: string,
   metadata?: { displayName?: string; username?: string }
 ) {
-  const redirectTo = redirectToApp();
+  const redirectTo = getAuthRedirectTo();
   const response = await authFetch<Partial<AuthResponse> & { user?: SupabaseAuthUser }>(
     redirectTo ? `signup?redirect_to=${encodeURIComponent(redirectTo)}` : "signup",
     {
@@ -116,6 +182,21 @@ export async function refreshAuthSession(refreshToken: string) {
   });
 
   return withExpiry(session);
+}
+
+export async function requestEmailChange(email: string, accessToken: string) {
+  const redirectTo = getAuthRedirectTo();
+
+  return authFetch<SupabaseAuthUser>(
+    redirectTo ? `user?redirect_to=${encodeURIComponent(redirectTo)}` : "user",
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ email })
+    }
+  );
 }
 
 export async function signOutSession(accessToken: string) {

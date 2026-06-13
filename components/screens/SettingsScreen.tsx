@@ -1,14 +1,14 @@
 "use client";
 
-import { ArrowLeft, Lock, LogOut, MessageCircle, Shield, Users, X } from "lucide-react";
+import { ArrowLeft, Lock, LogOut, Mail, MessageCircle, Shield, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthPanel } from "@/components/AuthPanel";
 import { SettingsCard, SettingsRow, ToggleSwitch } from "@/components/SettingsCard";
 import { useAppState } from "@/state/AppState";
 
-type SettingsPanel = "sent" | "friends" | "messages" | "close" | null;
+type SettingsPanel = "sent" | "friends" | "messages" | "email" | "close" | null;
 
 const commentOptions = ["Friends", "Everyone", "No one"];
 const viewOptions = ["Friends", "Everyone"];
@@ -28,6 +28,7 @@ export function SettingsScreen() {
     authSession,
     currentUser,
     deactivateAccount,
+    requestEmailChange,
     setAccentName,
     signOut,
     toggleExplore,
@@ -40,9 +41,12 @@ export function SettingsScreen() {
   const [storyReplies, setStoryReplies] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
   const [panel, setPanel] = useState<SettingsPanel>(null);
-  const [accountBusy, setAccountBusy] = useState<"signout" | "deactivate" | null>(
+  const [accountBusy, setAccountBusy] = useState<"signout" | "deactivate" | "email" | null>(
     null
   );
+  const [emailInput, setEmailInput] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   const panelTitle =
     panel === "sent"
@@ -51,7 +55,9 @@ export function SettingsScreen() {
         ? "Accounts that befriended you"
         : panel === "messages"
           ? "Message controls"
-          : "Close account";
+          : panel === "email"
+            ? "Change email"
+            : "Close account";
 
   async function handleSignOut() {
     if (accountBusy) {
@@ -62,6 +68,32 @@ export function SettingsScreen() {
     await signOut();
     setAccountBusy(null);
     router.replace("/home");
+  }
+
+  async function handleEmailChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (accountBusy) {
+      return;
+    }
+
+    setAccountBusy("email");
+    setEmailMessage("");
+    setEmailError("");
+
+    try {
+      await requestEmailChange(emailInput);
+      setEmailMessage(
+        "Confirmation links sent. Check your current and new email inboxes to finish the change."
+      );
+      setEmailInput("");
+    } catch (error) {
+      setEmailError(
+        error instanceof Error ? error.message : "Could not request an email change."
+      );
+    } finally {
+      setAccountBusy(null);
+    }
   }
 
   async function handleDeactivateAccount() {
@@ -175,6 +207,17 @@ export function SettingsScreen() {
       {authSession ? (
         <SettingsCard>
           <SettingsRow
+            title="Email address"
+            value={authSession.user.email ?? "Change"}
+            note="Send a confirmation link to update your login email."
+            onClick={() => {
+              setEmailInput("");
+              setEmailMessage("");
+              setEmailError("");
+              setPanel("email");
+            }}
+          />
+          <SettingsRow
             title={accountBusy === "signout" ? "Signing out..." : "Sign out"}
             note="Leave this device and clear local account data."
             onClick={() => void handleSignOut()}
@@ -252,6 +295,31 @@ export function SettingsScreen() {
                   />
                 </div>
               </div>
+            ) : null}
+            {panel === "email" ? (
+              <form className="settings-panel-body auth-form" onSubmit={handleEmailChange}>
+                <Mail size={34} />
+                <p>
+                  Current email: {authSession?.user.email ?? "unknown"}. Enter a new
+                  address and Blip will send confirmation links to finish the change.
+                </p>
+                <label>
+                  <span>New email</span>
+                  <input
+                    autoComplete="email"
+                    type="email"
+                    value={emailInput}
+                    onChange={(event) => setEmailInput(event.target.value)}
+                    placeholder="new@email.com"
+                    required
+                  />
+                </label>
+                {emailMessage ? <div className="auth-notice">{emailMessage}</div> : null}
+                {emailError ? <div className="auth-error">{emailError}</div> : null}
+                <button type="submit" disabled={accountBusy === "email"}>
+                  {accountBusy === "email" ? "Sending..." : "Send confirmation links"}
+                </button>
+              </form>
             ) : null}
             {panel === "close" ? (
               <div className="settings-panel-body">

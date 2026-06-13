@@ -29,6 +29,7 @@ import {
   type SupabaseSnapshot
 } from "@/lib/supabase/appData";
 import {
+  requestEmailChange as requestAuthEmailChange,
   refreshAuthSession,
   signInWithPassword,
   signOutSession,
@@ -163,6 +164,7 @@ interface AppStateValue {
   ) => Promise<void>;
   signOut: () => Promise<void>;
   deactivateAccount: () => Promise<void>;
+  requestEmailChange: (email: string) => Promise<void>;
   addLocalPost: (post: {
     type: "photo" | "video" | "text";
     content: string;
@@ -1462,6 +1464,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     await signOut();
   }, [authSession?.access_token, currentUser.id, signOut]);
 
+  const requestEmailChange = useCallback(
+    async (email: string) => {
+      const nextEmail = email.trim();
+
+      if (!authSession?.access_token) {
+        throw new Error("Log in before changing your email address.");
+      }
+
+      if (!nextEmail) {
+        throw new Error("Enter the new email address first.");
+      }
+
+      await requestAuthEmailChange(nextEmail, authSession.access_token);
+    },
+    [authSession?.access_token]
+  );
+
   const addLocalPost = useCallback(
     (post: {
       type: "photo" | "video" | "text";
@@ -1847,6 +1866,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signOut,
       deactivateAccount,
+      requestEmailChange,
       addLocalPost,
       editPost,
       createInstant,
@@ -1927,6 +1947,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       requestedUserIds,
       requestFriend,
       removeFriend,
+      requestEmailChange,
       replyToInstant,
       savedStickers,
       saveProfile,

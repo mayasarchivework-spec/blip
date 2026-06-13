@@ -22,9 +22,13 @@ function getNavItems(username: string) {
   ];
 }
 
-function isActive(pathname: string, href: string) {
+function isActive(pathname: string, href: string, ownProfileHref: string) {
   if (href.startsWith("/profile/")) {
-    return pathname.startsWith("/profile");
+    return pathname === ownProfileHref;
+  }
+
+  if (href === "/explore" && pathname.startsWith("/profile/")) {
+    return pathname !== ownProfileHref;
   }
 
   if (href === "/messages") {
@@ -38,11 +42,12 @@ export function BottomNav() {
   const pathname = usePathname();
   const { currentUser } = useAppState();
   const navItems = getNavItems(currentUser.username);
+  const ownProfileHref = `/profile/${currentUser.username}`;
 
   return (
     <nav className="bottom-tabbar" aria-label="Primary">
       {navItems.map(({ label, href, icon: Icon }) => {
-        const active = isActive(pathname, href);
+        const active = isActive(pathname, href, ownProfileHref);
         return (
           <Link key={href} href={href} className={active ? "active" : ""}>
             <Icon size={28} strokeWidth={active ? 2.4 : 2} />
@@ -58,6 +63,7 @@ export function SideNav() {
   const pathname = usePathname();
   const { currentUser } = useAppState();
   const navItems = getNavItems(currentUser.username);
+  const ownProfileHref = `/profile/${currentUser.username}`;
 
   return (
     <aside className="side-nav" aria-label="Primary">
@@ -66,7 +72,7 @@ export function SideNav() {
       </Link>
       <div className="side-nav-items">
         {navItems.map(({ label, href, icon: Icon }) => {
-          const active = isActive(pathname, href);
+          const active = isActive(pathname, href, ownProfileHref);
           return (
             <Link key={href} href={href} className={active ? "active" : ""}>
               <Icon size={24} strokeWidth={active ? 2.5 : 2} />

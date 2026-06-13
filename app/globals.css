@@ -2506,6 +2506,7 @@ button:disabled {
   border: 1px solid #ffb8c1;
   border-radius: 8px;
   font-size: 14px;
+  white-space: pre-line;
 }
 
 .auth-notice {
@@ -2516,6 +2517,7 @@ button:disabled {
   border: 1px solid #cfe0f9;
   border-radius: 8px;
   font-size: 14px;
+  white-space: pre-line;
 }
 
 .settings-title-row,

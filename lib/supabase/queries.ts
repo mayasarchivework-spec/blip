@@ -394,6 +394,19 @@ export function createMessageThread(
   });
 }
 
+export function createDirectMessageThread(
+  otherUserId: string,
+  accessToken?: string | null
+) {
+  return supabaseFetch<string>("rpc/create_direct_thread", {
+    accessToken,
+    method: "POST",
+    body: {
+      other_user: otherUserId
+    }
+  });
+}
+
 export function addThreadMembers(
   threadId: string,
   members: Array<{ userId: string; role?: "owner" | "member" }>,

@@ -236,6 +236,25 @@ alter table public.friendships add column if not exists user_low uuid references
 alter table public.friendships add column if not exists user_high uuid references public.profiles(id) on delete cascade;
 alter table public.friendships add column if not exists created_at timestamptz not null default now();
 
+insert into public.friendships (user_low, user_high)
+select
+  least(from_user_id, to_user_id),
+  greatest(from_user_id, to_user_id)
+from public.friend_requests
+where status = 'accepted'
+on conflict (user_low, user_high) do nothing;
+
+update public.friend_requests fr
+set status = 'accepted',
+    responded_at = coalesce(fr.responded_at, now())
+where fr.status = 'pending'
+  and exists (
+    select 1
+    from public.friendships f
+    where f.user_low = least(fr.from_user_id, fr.to_user_id)
+      and f.user_high = greatest(fr.from_user_id, fr.to_user_id)
+  );
+
 alter table public.posts add column if not exists user_id uuid references public.profiles(id) on delete cascade;
 alter table public.posts add column if not exists type public.post_type not null default 'text';
 alter table public.posts add column if not exists content text not null default '';
@@ -261,6 +280,15 @@ alter table public.posts
     jsonb_typeof(image_urls) = 'array'
     and jsonb_array_length(image_urls) <= 20
   );
+
+update public.posts
+set visibility = 'public'
+where user_id in (
+  select id
+  from public.profiles
+  where is_private = false
+    and view_audience = 'everyone'
+);
 
 alter table public.post_blips add column if not exists post_id uuid references public.posts(id) on delete cascade;
 alter table public.post_blips add column if not exists user_id uuid references public.profiles(id) on delete cascade;
@@ -723,6 +751,62 @@ create trigger messages_touch_thread
 after insert on public.messages
 for each row
 execute function public.touch_message_thread();
+
+create or replace function public.create_direct_thread(other_user uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  existing_thread_id uuid;
+  next_thread_id uuid;
+begin
+  if current_user_id is null then
+    raise exception 'not authenticated';
+  end if;
+
+  if other_user is null or other_user = current_user_id then
+    raise exception 'choose another Blip user';
+  end if;
+
+  if not exists (select 1 from public.profiles p where p.id = other_user) then
+    raise exception 'profile not found';
+  end if;
+
+  select mt.id
+  into existing_thread_id
+  from public.message_threads mt
+  join public.thread_members mine
+    on mine.thread_id = mt.id
+    and mine.user_id = current_user_id
+  join public.thread_members theirs
+    on theirs.thread_id = mt.id
+    and theirs.user_id = other_user
+  where mt.is_group = false
+  limit 1;
+
+  if existing_thread_id is not null then
+    return existing_thread_id;
+  end if;
+
+  insert into public.message_threads (created_by, is_group, title)
+  values (current_user_id, false, null)
+  returning id into next_thread_id;
+
+  insert into public.thread_members (thread_id, user_id, role)
+  values
+    (next_thread_id, current_user_id, 'owner'),
+    (next_thread_id, other_user, 'member')
+  on conflict (thread_id, user_id) do nothing;
+
+  return next_thread_id;
+end;
+$$;
+
+revoke all on function public.create_direct_thread(uuid) from public;
+grant execute on function public.create_direct_thread(uuid) to authenticated;
 
 insert into storage.buckets (id, name, public)
 values

@@ -39,10 +39,9 @@ import {
 } from "@/lib/supabase/auth";
 import {
   answerFriendRequest as updateFriendRequestStatus,
-  addThreadMembers,
+  createDirectMessageThread,
   createInstant as createRemoteInstant,
   createMessage,
-  createMessageThread,
   createPost as createRemotePost,
   createPostBlip,
   createPostComment,
@@ -1130,7 +1129,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const requestFriend = useCallback(
     (userId: string) => {
-      if (isGuest) {
+      if (isGuest || isFriend(userId)) {
         return;
       }
 
@@ -1144,7 +1143,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         () => undefined
       );
     },
-    [authSession?.access_token, currentUser.id, isGuest]
+    [authSession?.access_token, currentUser.id, isFriend, isGuest]
   );
 
   const removeFriend = useCallback((userId: string) => {
@@ -1182,11 +1181,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const hasRequested = useCallback(
     (userId: string) =>
-      requestedUserIds.includes(userId) ||
-      currentUser.friendRequestsSent.some(
-        (request) => request.toUserId === userId && request.status !== "ignored"
-      ),
-    [currentUser.friendRequestsSent, requestedUserIds]
+      !isFriend(userId) &&
+      (requestedUserIds.includes(userId) ||
+        currentUser.friendRequestsSent.some(
+          (request) => request.toUserId === userId && request.status === "pending"
+        )),
+    [currentUser.friendRequestsSent, isFriend, requestedUserIds]
   );
 
   const blipPost = useCallback(
@@ -1360,25 +1360,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       if (isRemoteId(currentUser.id) && isRemoteId(userId) && authSession?.access_token) {
         try {
-          const [remoteThread] = await createMessageThread(
-            currentUser.id,
-            null,
-            false,
-            authSession.access_token
-          );
+          const threadId = await createDirectMessageThread(userId, authSession.access_token);
 
-          if (remoteThread?.id) {
-            await addThreadMembers(
-              remoteThread.id,
-              [
-                { userId: currentUser.id, role: "owner" },
-                { userId, role: "member" }
-              ],
-              authSession.access_token
-            );
-
+          if (threadId) {
             const nextThread: MessageThread = {
-              id: remoteThread.id,
+              id: threadId,
               participantIds: [currentUser.id, userId],
               lastMessage: "new conversation",
               timestamp: "now",
@@ -1388,13 +1374,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
             setLocalThreads((items) => [
               nextThread,
-              ...items.filter((thread) => thread.id !== remoteThread.id)
+              ...items.filter((thread) => thread.id !== threadId)
             ]);
 
-            return remoteThread.id;
+            return threadId;
           }
         } catch {
-          // Keep the local chat fallback so the UI still opens if Supabase blocks creation.
+          return null;
         }
       }
 

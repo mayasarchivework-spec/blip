@@ -249,6 +249,10 @@ function addFriendship(users: User[], leftUserId: string, rightUserId: string) {
 }
 
 function addFriendRequest(users: User[], request: FriendRequest) {
+  if (request.status !== "pending") {
+    return;
+  }
+
   const from = users.find((user) => user.id === request.fromUserId);
   const to = users.find((user) => user.id === request.toUserId);
 

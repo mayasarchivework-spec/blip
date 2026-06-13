@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Lock, LogOut, Mail, MessageCircle, Shield, Users, X } from "lucide-react";
+import { ArrowLeft, Heart, Lock, LogOut, Mail, MessageCircle, Shield, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
@@ -240,6 +240,27 @@ export function SettingsScreen() {
           />
         </SettingsCard>
       ) : null}
+      <SettingsCard>
+        <div className="support-banner">
+          <div className="support-banner-head">
+            <span>
+              <Heart size={24} fill="currentColor" />
+            </span>
+            <div>
+              <h2>Support Blip</h2>
+              <p>if you love using blip, support to keep it running :)</p>
+            </div>
+          </div>
+          <iframe
+            id="kofiframe"
+            src="https://ko-fi.com/mayasarchive1/?hidefeed=true&widget=true&embed=true&preview=true"
+            className="support-kofi-frame"
+            height={712}
+            title="mayasarchive1"
+            loading="lazy"
+          />
+        </div>
+      </SettingsCard>
       <button type="button" className="danger-card settings-danger-button" onClick={() => setPanel("close")}>
         <div className="danger-lock">
           <Lock size={32} />

@@ -389,6 +389,7 @@ export function ExploreScreen() {
             {suggestedUsers.length ? (
               suggestedUsers.slice(0, activeCategory === "People" ? 24 : 6).map((user) => {
                 const ownProfile = user.id === currentUser.id;
+                const friend = isFriend(user.id);
                 const requested = hasRequested(user.id);
                 return (
                   <div key={user.id} className="suggested-person">
@@ -401,16 +402,18 @@ export function ExploreScreen() {
                     </Link>
                     <BlipButton
                       type="button"
-                      disabled={ownProfile || isGuest || requested}
+                      disabled={ownProfile || isGuest || friend || requested}
                       onClick={() => requestFriend(user.id)}
                     >
                       {ownProfile
                         ? "Your profile"
                         : isGuest
                           ? "Sign in to add"
-                          : requested
-                            ? "Request sent"
-                            : "Add friend"}
+                          : friend
+                            ? "Friends"
+                            : requested
+                              ? "Request sent"
+                              : "Add friend"}
                     </BlipButton>
                   </div>
                 );

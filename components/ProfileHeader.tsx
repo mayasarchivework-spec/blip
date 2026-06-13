@@ -5,6 +5,7 @@ import {
   Copy,
   Heart,
   ImagePlus,
+  Lock,
   Mail,
   MessageCircle,
   MessageSquare,
@@ -38,6 +39,7 @@ export function ProfileHeader({
     currentUser,
     getUserById,
     hasRequested,
+    isGuest,
     openInstant,
     posts,
     removeFriend,
@@ -202,6 +204,11 @@ export function ProfileHeader({
           <div className="profile-name-row">
             <h2>
               <VerifiedName user={user} />
+              {user.isPrivate ? (
+                <span className="profile-private-lock" title="Private account" aria-label="Private account">
+                  <Lock size={18} strokeWidth={3} />
+                </span>
+              ) : null}
             </h2>
             {isOwnerProfile ? (
               <Link href="/settings" className="gear-link" aria-label="Open settings">
@@ -277,10 +284,10 @@ export function ProfileHeader({
           <BlipButton
             type="button"
             wide
-            disabled={requested}
+            disabled={isGuest || requested}
             onClick={() => requestFriend(user.id)}
           >
-            {requested ? "Request sent" : "Add friend"}
+            {isGuest ? "Sign in to add" : requested ? "Request sent" : "Add friend"}
           </BlipButton>
         )}
       </div>

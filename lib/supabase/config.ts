@@ -10,7 +10,9 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 const ownerEmails = toList(process.env.NEXT_PUBLIC_BLIP_OWNER_EMAILS);
 const ownerUsernames = toList(process.env.NEXT_PUBLIC_BLIP_OWNER_USERNAMES);
 const adminEmails = toList(process.env.NEXT_PUBLIC_BLIP_ADMIN_EMAILS);
-const adminUsernames = toList(process.env.NEXT_PUBLIC_BLIP_ADMIN_USERNAMES);
+const adminUsernames = [
+  ...new Set(["admin", ...toList(process.env.NEXT_PUBLIC_BLIP_ADMIN_USERNAMES)])
+];
 
 export function assertSupabaseConfig() {
   if (!isSupabaseConfigured) {

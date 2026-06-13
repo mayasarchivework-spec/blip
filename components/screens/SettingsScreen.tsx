@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Lock, MessageCircle, Shield, Users, X } from "lucide-react";
+import { ArrowLeft, Lock, LogOut, MessageCircle, Shield, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
@@ -25,8 +25,11 @@ export function SettingsScreen() {
   const {
     accent,
     accentOptions,
+    authSession,
     currentUser,
+    deactivateAccount,
     setAccentName,
+    signOut,
     toggleExplore,
     togglePrivate
   } = useAppState();
@@ -37,6 +40,9 @@ export function SettingsScreen() {
   const [storyReplies, setStoryReplies] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
   const [panel, setPanel] = useState<SettingsPanel>(null);
+  const [accountBusy, setAccountBusy] = useState<"signout" | "deactivate" | null>(
+    null
+  );
 
   const panelTitle =
     panel === "sent"
@@ -46,6 +52,28 @@ export function SettingsScreen() {
         : panel === "messages"
           ? "Message controls"
           : "Close account";
+
+  async function handleSignOut() {
+    if (accountBusy) {
+      return;
+    }
+
+    setAccountBusy("signout");
+    await signOut();
+    setAccountBusy(null);
+    router.replace("/home");
+  }
+
+  async function handleDeactivateAccount() {
+    if (accountBusy) {
+      return;
+    }
+
+    setAccountBusy("deactivate");
+    await deactivateAccount();
+    setAccountBusy(null);
+    router.replace("/home");
+  }
 
   return (
     <div className="screen">
@@ -144,6 +172,15 @@ export function SettingsScreen() {
           onClick={() => setPanel("messages")}
         />
       </SettingsCard>
+      {authSession ? (
+        <SettingsCard>
+          <SettingsRow
+            title={accountBusy === "signout" ? "Signing out..." : "Sign out"}
+            note="Leave this device and clear local account data."
+            onClick={() => void handleSignOut()}
+          />
+        </SettingsCard>
+      ) : null}
       <button type="button" className="danger-card settings-danger-button" onClick={() => setPanel("close")}>
         <div className="danger-lock">
           <Lock size={32} />
@@ -218,14 +255,43 @@ export function SettingsScreen() {
             ) : null}
             {panel === "close" ? (
               <div className="settings-panel-body">
-                <Shield size={34} />
-                <p>
-                  Account closure is a backend action, so this prototype keeps you safe and
-                  leaves the account active.
-                </p>
-                <button type="button" onClick={() => setPanel(null)}>
-                  Keep account active
-                </button>
+                {authSession ? (
+                  <>
+                    <Shield size={34} />
+                    <p>
+                      Deactivate makes your account private, removes your posts from Explore,
+                      signs you out, and clears account data from this device.
+                    </p>
+                    <div className="settings-panel-actions">
+                      <button
+                        type="button"
+                        className="danger-action"
+                        disabled={accountBusy === "deactivate"}
+                        onClick={() => void handleDeactivateAccount()}
+                      >
+                        {accountBusy === "deactivate"
+                          ? "Deactivating..."
+                          : "Deactivate and sign out"}
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-action"
+                        disabled={accountBusy === "deactivate"}
+                        onClick={() => setPanel(null)}
+                      >
+                        Keep account active
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <LogOut size={34} />
+                    <p>Sign in first to deactivate an account on this device.</p>
+                    <button type="button" onClick={() => setPanel(null)}>
+                      Done
+                    </button>
+                  </>
+                )}
               </div>
             ) : null}
           </div>

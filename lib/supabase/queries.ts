@@ -271,6 +271,16 @@ export function createInstant(instant: InstantInsert, accessToken?: string | nul
   });
 }
 
+export function deleteInstant(instantId: string, accessToken?: string | null) {
+  return supabaseFetch("instants", {
+    accessToken,
+    method: "DELETE",
+    query: {
+      id: `eq.${instantId}`
+    }
+  });
+}
+
 export function sendFriendRequest(
   fromUserId: string,
   toUserId: string,

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Send, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AvatarRing } from "@/components/AvatarRing";
 import { BlipButton } from "@/components/BlipButton";
@@ -33,6 +33,7 @@ export function InstantModal() {
     canInteractWith,
     closeInstant,
     currentUser,
+    deleteInstant,
     getInstantsForUser,
     getUserById,
     replyToInstant
@@ -64,6 +65,7 @@ export function InstantModal() {
 
   const instantUserId = user.id;
   const canReply = currentUser.id !== instantUserId && canInteractWith(instantUserId);
+  const canDelete = currentUser.id === instantUserId;
   const hasMultipleInstants = instantList.length > 1;
 
   function moveInstant(direction: -1 | 1) {
@@ -95,6 +97,17 @@ export function InstantModal() {
     window.setTimeout(() => setReplyStatus(""), 1400);
   }
 
+  function handleDeleteInstant() {
+    deleteInstant(instant.id);
+
+    if (instantList.length <= 1) {
+      closeInstant();
+      return;
+    }
+
+    setInstantIndex((index) => Math.min(index, instantList.length - 2));
+  }
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="instant-viewer">
@@ -109,6 +122,17 @@ export function InstantModal() {
             </strong>
             <span>{formatInstantExpiry(instant.expiresAt)}</span>
           </div>
+          {canDelete ? (
+            <button
+              type="button"
+              className="instant-delete-button"
+              onClick={handleDeleteInstant}
+              aria-label="Delete Instant"
+              title="Delete Instant"
+            >
+              <Trash2 size={17} />
+            </button>
+          ) : null}
         </div>
         {hasMultipleInstants ? (
           <div className="instant-progress" aria-hidden="true">

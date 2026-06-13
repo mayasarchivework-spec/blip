@@ -1,7 +1,4 @@
-import { mockInstants } from "@/data/mockInstants";
-import { mockThreads } from "@/data/mockMessages";
-import { mockPosts } from "@/data/mockPosts";
-import { currentUserId, mockUsers } from "@/data/mockUsers";
+import { currentUserId } from "@/data/mockUsers";
 import type {
   ChatMessage,
   FriendRequest,
@@ -34,6 +31,7 @@ import {
   fetchProfiles,
   fetchThreadMembers
 } from "@/lib/supabase/queries";
+import { getConfiguredAccountRole } from "@/lib/supabase/config";
 
 export interface SupabaseSnapshot {
   profiles: ProfileRow[];
@@ -107,12 +105,12 @@ export function buildAppDataset(
 ): AppDataset {
   if (!snapshot) {
     return {
-      users: mockUsers,
-      posts: mockPosts,
-      instants: mockInstants,
-      threads: mockThreads,
+      users: [],
+      posts: [],
+      instants: [],
+      threads: [],
       currentUserId,
-      source: "mock"
+      source: "supabase"
     };
   }
 
@@ -137,7 +135,10 @@ export function buildAppDataset(
       id: profile.id,
       username,
       displayName,
-      accountRole: profile.account_role ?? "user",
+      accountRole:
+        profile.account_role && profile.account_role !== "user"
+          ? profile.account_role
+          : getConfiguredAccountRole(undefined, username),
       bio: cleanProfileText(profile.bio, ""),
       avatarUrl: profile.avatar_url ?? "/assets/avatar-racer.svg",
       bannerUrl: profile.banner_url ?? undefined,

@@ -24,6 +24,7 @@ export function AuthPanel() {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const busy = authStatus === "loading";
+  const authNotice = authError?.toLowerCase().includes("check your email");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,16 +45,16 @@ export function AuthPanel() {
             <UserRound size={24} />
           </div>
           <div>
-            <h2>Supabase account</h2>
+            <h2>Blip account</h2>
             <p>
-              Signed in as @{currentUser.username}. Blips, comments, messages, and
-              profile settings can now use the live tables.
+              Signed in as @{currentUser.username}. Your Blips, profile, friends,
+              and messages are connected.
             </p>
           </div>
         </div>
         <div className="auth-status-row">
           <span>{backendReady ? "Connected" : "Connecting..."}</span>
-          <span>{backendSource === "supabase" ? "Live data" : "Demo fallback"}</span>
+          <span>{backendSource === "supabase" ? "Blip backend" : "Local preview"}</span>
         </div>
         <BlipButton type="button" variant="secondary" onClick={() => void signOut()}>
           <LogOut size={18} /> Sign out
@@ -70,7 +71,7 @@ export function AuthPanel() {
         </div>
         <div>
           <h2>Join Blip</h2>
-          <p>Sign up or sign in to post, blip, comment, message friends, and edit your profile.</p>
+          <p>Sign up or log in to post, blip, comment, message friends, and edit your profile.</p>
         </div>
       </div>
       <div className="auth-tabs">
@@ -79,7 +80,7 @@ export function AuthPanel() {
           className={mode === "sign-in" ? "active" : ""}
           onClick={() => setMode("sign-in")}
         >
-          Sign in
+          Log in
         </button>
         <button
           type="button"
@@ -134,9 +135,11 @@ export function AuthPanel() {
             </label>
           </>
         ) : null}
-        {authError ? <p className="auth-error">{authError}</p> : null}
+        {authError ? (
+          <p className={authNotice ? "auth-notice" : "auth-error"}>{authError}</p>
+        ) : null}
         <BlipButton type="submit" disabled={busy}>
-          {busy ? "Connecting..." : mode === "sign-in" ? "Sign in" : "Create account"}
+          {busy ? "Connecting..." : mode === "sign-in" ? "Log in to Blip" : "Create Blip account"}
         </BlipButton>
       </form>
     </SettingsCard>

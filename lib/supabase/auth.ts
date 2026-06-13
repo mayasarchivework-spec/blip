@@ -3,6 +3,7 @@ import { assertSupabaseConfig, supabaseKey, supabaseUrl } from "@/lib/supabase/c
 export interface SupabaseAuthUser {
   id: string;
   email?: string;
+  user_metadata?: Record<string, unknown>;
 }
 
 export interface SupabaseAuthSession {
@@ -28,6 +29,15 @@ interface AuthErrorResponse {
 function authUrl(path: string) {
   assertSupabaseConfig();
   return new URL(`/auth/v1/${path.replace(/^\/+/, "")}`, supabaseUrl).toString();
+}
+
+function redirectToApp() {
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_SITE_URL ?? "";
+
+  return origin ? `${origin.replace(/\/+$/, "")}/home` : undefined;
 }
 
 async function authFetch<T>(path: string, init: RequestInit = {}) {
@@ -70,12 +80,25 @@ export async function signInWithPassword(email: string, password: string) {
   return withExpiry(session);
 }
 
-export async function signUpWithPassword(email: string, password: string) {
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+  metadata?: { displayName?: string; username?: string }
+) {
+  const redirectTo = redirectToApp();
   const response = await authFetch<Partial<AuthResponse> & { user?: SupabaseAuthUser }>(
-    "signup",
+    redirectTo ? `signup?redirect_to=${encodeURIComponent(redirectTo)}` : "signup",
     {
       method: "POST",
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({
+        email,
+        password,
+        data: {
+          app_name: "Blip",
+          display_name: metadata?.displayName,
+          username: metadata?.username
+        }
+      })
     }
   );
 

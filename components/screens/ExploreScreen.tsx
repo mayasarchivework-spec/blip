@@ -196,7 +196,15 @@ export function ExploreScreen() {
   }, [normalizedQuery, publicPostPool]);
 
   const showFullPeopleResults = activeCategory === "People" || Boolean(normalizedQuery);
-  const suggestedUsers = users
+  const visibleExploreUsers = users.filter((user) => {
+    const effectiveUserProfile = effectiveUser(user);
+
+    return (
+      effectiveUserProfile.allowExplore &&
+      (!effectiveUserProfile.isPrivate || isFriend(user.id) || user.id === currentUser.id)
+    );
+  });
+  const suggestedUsers = visibleExploreUsers
     .filter((user) => showFullPeopleResults || (user.id !== currentUser.id && !isFriend(user.id)))
     .filter((user) => !normalizedQuery || userSearchText(user).includes(normalizedQuery));
 

@@ -713,17 +713,18 @@ button:disabled {
 .verified-check {
   display: inline-grid;
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   place-items: center;
   color: #ffffff;
   background:
     linear-gradient(rgba(255, 255, 255, 0.42), transparent 48%),
-    linear-gradient(#2f8cff, #005bd6);
-  border: 1px solid #004ebd;
+    linear-gradient(var(--accent-light), var(--accent-dark));
+  border: 1px solid var(--accent-dark);
   border-radius: 999px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.72),
     0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
@@ -1580,9 +1581,30 @@ button:disabled {
 }
 
 .profile-name-row h2 {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   font-size: 36px;
   font-weight: 900;
+}
+
+.profile-private-lock {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: #ffffff;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.36), transparent 48%),
+    linear-gradient(var(--accent-light), var(--accent-dark));
+  border: 1px solid var(--accent-dark);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .gear-link {
@@ -1688,6 +1710,42 @@ button:disabled {
 .profile-actions > .blip-button:only-child,
 .profile-actions > .blip-link-button:only-child {
   grid-column: 1 / -1;
+}
+
+.hidden-posts-panel {
+  margin-top: 14px;
+}
+
+.hidden-posts-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 10px;
+  max-width: 980px;
+  padding: 12px 14px;
+  color: #444444;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.88), rgba(247, 247, 247, 0.9)),
+    linear-gradient(#ffffff, #eeeeee);
+  border: 1px solid #d3d3d3;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.hidden-posts-head h2,
+.hidden-posts-head p {
+  margin: 0;
+}
+
+.hidden-posts-head h2 {
+  font-size: 18px;
+}
+
+.hidden-posts-head p {
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .profile-panel-modal {
@@ -2450,6 +2508,16 @@ button:disabled {
   font-size: 14px;
 }
 
+.auth-notice {
+  margin: 0;
+  padding: 9px 10px;
+  color: var(--accent-dark);
+  background: #eef5ff;
+  border: 1px solid #cfe0f9;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
 .settings-title-row,
 .toggle-row,
 .settings-row,
@@ -2650,6 +2718,37 @@ button:disabled {
   border: 1px solid var(--accent-dark);
   border-radius: 8px;
   font-weight: 800;
+}
+
+.settings-panel-actions {
+  display: grid;
+  gap: 9px;
+}
+
+.settings-panel-actions button {
+  min-height: 42px;
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.settings-panel-actions button:disabled {
+  cursor: default;
+  opacity: 0.68;
+}
+
+.settings-panel-actions .danger-action {
+  color: #ffffff;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.28), transparent 45%),
+    linear-gradient(#ff7184, var(--danger));
+  border: 1px solid #c53448;
+}
+
+.settings-panel-actions .secondary-action {
+  color: #444444;
+  background: linear-gradient(#ffffff, #eeeeee);
+  border: 1px solid #c8c8c8;
+  box-shadow: inset 0 1px 0 #ffffff;
 }
 
 .settings-panel-controls .settings-row {
@@ -2995,6 +3094,23 @@ button:disabled {
 .instant-top span {
   opacity: 0.85;
   font-size: 13px;
+}
+
+.instant-delete-button {
+  display: inline-grid;
+  width: 36px;
+  height: 34px;
+  margin-left: auto;
+  place-items: center;
+  color: #ffffff;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.24), transparent 48%),
+    rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .instant-progress {
@@ -3373,6 +3489,13 @@ button:disabled {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
     0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.notification-empty {
+  margin: 6px;
+  padding: 12px;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .notification-item {

@@ -42,6 +42,7 @@ import {
   createPost as createRemotePost,
   createPostBlip,
   createPostComment,
+  deleteInstant as deleteRemoteInstant,
   deletePostBlip,
   deletePost as deleteRemotePost,
   fetchProfileById,
@@ -52,6 +53,7 @@ import {
   upsertProfile
 } from "@/lib/supabase/queries";
 import { getConfiguredAccountRole, isSupabaseConfigured } from "@/lib/supabase/config";
+import { uploadProfileImage } from "@/lib/supabase/storage";
 
 const defaultAdjustments: EditorAdjustments = {
   brightness: 15,
@@ -83,6 +85,7 @@ interface StoredAppState {
   blippedPostIds?: string[];
   hiddenPostIds?: string[];
   deletedPostIds?: string[];
+  deletedInstantIds?: string[];
   localPosts?: Post[];
   localInstants?: Instant[];
   localThreads?: MessageThread[];
@@ -140,6 +143,7 @@ interface AppStateValue {
     displayName: string
   ) => Promise<void>;
   signOut: () => Promise<void>;
+  deactivateAccount: () => Promise<void>;
   addLocalPost: (post: {
     type: "photo" | "video" | "text";
     content: string;
@@ -155,6 +159,7 @@ interface AppStateValue {
     thumbnailUrl?: string;
     videoUrl?: string;
   }) => void;
+  deleteInstant: (instantId: string) => void;
   deletePost: (postId: string) => void;
   hidePost: (postId: string) => void;
   pinPost: (postId: string) => void;
@@ -225,6 +230,19 @@ function sanitizeUsername(value: string, fallback: string) {
 
   const username = normalized.length >= 2 ? normalized : fallback;
   return username.slice(0, 30);
+}
+
+function sanitizeDisplayName(value: string | undefined, fallback: string) {
+  const normalized = (value ?? "")
+    .replace(/[✓✔☑✅]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return (normalized || fallback).slice(0, 50);
+}
+
+function metadataString(value: unknown) {
+  return typeof value === "string" ? value : "";
 }
 
 function usernameWithSuffix(username: string, userId: string) {
@@ -340,8 +358,16 @@ async function ensureProfileForSession(
   }
 
   const emailName = session.user.email?.split("@")[0] ?? "blip";
-  const username = sanitizeUsername(values?.username || emailName, "blip");
-  const displayName = values?.displayName?.trim() || username;
+  const username = sanitizeUsername(
+    values?.username || metadataString(session.user.user_metadata?.username) || emailName,
+    "blip"
+  );
+  const displayName = sanitizeDisplayName(
+    values?.displayName ||
+      metadataString(session.user.user_metadata?.display_name) ||
+      metadataString(session.user.user_metadata?.displayName),
+    username
+  );
   const profile = {
     id: session.user.id,
     username,
@@ -433,6 +459,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [blippedPostIds, setBlippedPostIds] = useState<string[]>([]);
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([]);
   const [deletedPostIds, setDeletedPostIds] = useState<string[]>([]);
+  const [deletedInstantIds, setDeletedInstantIds] = useState<string[]>([]);
   const [localPosts, setLocalPosts] = useState<Post[]>([]);
   const [localInstants, setLocalInstants] = useState<Instant[]>([]);
   const [localThreads, setLocalThreads] = useState<MessageThread[]>([]);
@@ -538,27 +565,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty("--accent-color", accent.color);
     root.style.setProperty("--accent-dark", accent.dark);
     root.style.setProperty("--accent-light", accent.light);
-
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent.light}"/><stop offset=".52" stop-color="${accent.color}"/><stop offset="1" stop-color="${accent.dark}"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M19 21h25a9 9 0 0 1 0 18H19" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M19 35h23a8 8 0 0 1 0 16H31" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M17 50a13 13 0 0 1 13-13" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><circle cx="18" cy="50" r="5" fill="#fff"/></svg>`;
-    const href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
-    const existingIconLinks = Array.from(
-      document.querySelectorAll<HTMLLinkElement>(
-        'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
-      )
-    );
-    const iconLinks = existingIconLinks.length
-      ? existingIconLinks
-      : [document.createElement("link")];
-
-    iconLinks.forEach((link, index) => {
-      link.rel = link.rel || (index === 0 ? "icon" : "shortcut icon");
-      link.type = "image/svg+xml";
-      link.href = href;
-
-      if (!link.parentElement) {
-        document.head.appendChild(link);
-      }
-    });
   }, [accent]);
 
   useEffect(() => {
@@ -612,6 +618,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
       if (Array.isArray(stored.deletedPostIds)) {
         setDeletedPostIds(stored.deletedPostIds);
+      }
+      if (Array.isArray(stored.deletedInstantIds)) {
+        setDeletedInstantIds(stored.deletedInstantIds);
       }
       if (Array.isArray(stored.localPosts)) {
         setLocalPosts(stored.localPosts);
@@ -691,6 +700,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       blippedPostIds,
       hiddenPostIds,
       deletedPostIds,
+      deletedInstantIds,
       localPosts,
       localInstants,
       localThreads,
@@ -714,6 +724,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     editorFilter,
     favoriteUserIds,
     deletedPostIds,
+    deletedInstantIds,
     hiddenPostIds,
     isPrivate,
     localInstants,
@@ -896,9 +907,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const instants = useMemo(
     () =>
       [...(isGuest ? [] : localInstants), ...dataset.instants].filter(
-        (instant) => instant.type !== "song" && isActiveInstant(instant)
+        (instant) =>
+          instant.type !== "song" &&
+          isActiveInstant(instant) &&
+          !deletedInstantIds.includes(instant.id)
       ),
-    [dataset.instants, isGuest, localInstants]
+    [dataset.instants, deletedInstantIds, isGuest, localInstants]
   );
 
   const getUserById = useCallback(
@@ -1022,6 +1036,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const requestFriend = useCallback(
     (userId: string) => {
+      if (isGuest) {
+        return;
+      }
+
       setRequestedUserIds((ids) => (ids.includes(userId) ? ids : [...ids, userId]));
 
       if (!isRemoteId(currentUser.id) || !isRemoteId(userId)) {
@@ -1032,7 +1050,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         () => undefined
       );
     },
-    [authSession?.access_token, currentUser.id]
+    [authSession?.access_token, currentUser.id, isGuest]
   );
 
   const removeFriend = useCallback((userId: string) => {
@@ -1328,7 +1346,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setAuthError(null);
 
       try {
-        const session = await signUpWithPassword(email, password);
+        const session = await signUpWithPassword(email, password, {
+          displayName,
+          username
+        });
         await ensureProfileForSession(session, { displayName, username });
         persistSession(session);
         setSnapshot(await loadSupabaseSnapshot(session.access_token));
@@ -1344,9 +1365,39 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     const token = authSession?.access_token;
 
     window.localStorage.removeItem(authStorageKey);
+    window.localStorage.removeItem(storageKey);
     setAuthSession(null);
     setAuthStatus("idle");
     setAuthError(null);
+    setHasStoredState(false);
+    setAccentNameState(mockCurrentUser.accentColor);
+    setIsPrivate(mockCurrentUser.isPrivate);
+    setAllowExplore(mockCurrentUser.allowExplore);
+    setFavoriteUserIds([]);
+    setRequestedUserIds([]);
+    setAcceptedFriendIds([]);
+    setRemovedFriendIds([]);
+    setBlipOverrides({});
+    setCommentOverrides({});
+    setPostEditOverrides({});
+    setPinnedPostOverrides({});
+    setBlippedPostIds([]);
+    setHiddenPostIds([]);
+    setDeletedPostIds([]);
+    setDeletedInstantIds([]);
+    setLocalPosts([]);
+    setLocalInstants([]);
+    setLocalThreads([]);
+    setThreadMessageOverrides({});
+    setProfileOverrides({});
+    setSavedStickers([]);
+    setUserNoteState("");
+    setUserNoteExpiresAt(null);
+    setCommentsByPostId({});
+    setActiveInstantUserId(null);
+    setComposerType(null);
+    setEditorFilter("Bleach Bypass");
+    setEditorAdjustments(defaultAdjustments);
 
     if (token) {
       await signOutSession(token).catch(() => undefined);
@@ -1355,7 +1406,35 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured) {
       setSnapshot(await loadSupabaseSnapshot().catch(() => null));
     }
-  }, [authSession?.access_token]);
+  }, [
+    authSession?.access_token,
+    mockCurrentUser.accentColor,
+    mockCurrentUser.allowExplore,
+    mockCurrentUser.isPrivate
+  ]);
+
+  const deactivateAccount = useCallback(async () => {
+    setIsPrivate(true);
+    setAllowExplore(false);
+    setProfileOverrides((current) => ({
+      ...current,
+      isPrivate: true,
+      allowExplore: false
+    }));
+
+    if (isRemoteId(currentUser.id)) {
+      await updateProfile(
+        currentUser.id,
+        {
+          is_private: true,
+          allow_explore: false
+        },
+        authSession?.access_token
+      ).catch(() => undefined);
+    }
+
+    await signOut();
+  }, [authSession?.access_token, currentUser.id, signOut]);
 
   const addLocalPost = useCallback(
     (post: {
@@ -1492,6 +1571,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [authSession?.access_token, currentUser.id]
   );
 
+  const deleteInstant = useCallback((instantId: string) => {
+    setLocalInstants((items) => items.filter((instant) => instant.id !== instantId));
+    setDeletedInstantIds((ids) =>
+      ids.includes(instantId) ? ids : [...ids, instantId]
+    );
+
+    if (!isRemoteId(instantId)) {
+      return;
+    }
+
+    void deleteRemoteInstant(instantId, authSession?.access_token).catch(() => undefined);
+  }, [authSession?.access_token]);
+
   const deletePost = useCallback((postId: string) => {
     setLocalPosts((items) => items.filter((post) => post.id !== postId));
     setDeletedPostIds((ids) => (ids.includes(postId) ? ids : [...ids, postId]));
@@ -1547,7 +1639,57 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const saveProfile = useCallback(
     async (updates: Partial<User>) => {
-      setProfileOverrides((current) => ({ ...current, ...updates }));
+      const normalizedUpdates: Partial<User> = { ...updates };
+
+      if (updates.displayName !== undefined) {
+        normalizedUpdates.displayName = sanitizeDisplayName(
+          updates.displayName,
+          currentUser.username
+        );
+      }
+
+      if (updates.username !== undefined) {
+        normalizedUpdates.username = sanitizeUsername(
+          updates.username,
+          currentUser.username
+        );
+      }
+
+      const shouldUploadProfileMedia =
+        isRemoteId(currentUser.id) &&
+        Boolean(authSession?.access_token) &&
+        isSupabaseConfigured;
+      const resolvedUpdates: Partial<User> = { ...normalizedUpdates };
+      const nextAvatarUrl = normalizedUpdates.avatarUrl;
+      const nextBannerUrl = normalizedUpdates.bannerUrl;
+
+      if (
+        shouldUploadProfileMedia &&
+        typeof nextAvatarUrl === "string" &&
+        isDataUrl(nextAvatarUrl)
+      ) {
+        resolvedUpdates.avatarUrl = await uploadProfileImage({
+          accessToken: authSession?.access_token,
+          dataUrl: nextAvatarUrl,
+          kind: "avatar",
+          userId: currentUser.id
+        }).catch(() => nextAvatarUrl);
+      }
+
+      if (
+        shouldUploadProfileMedia &&
+        typeof nextBannerUrl === "string" &&
+        isDataUrl(nextBannerUrl)
+      ) {
+        resolvedUpdates.bannerUrl = await uploadProfileImage({
+          accessToken: authSession?.access_token,
+          dataUrl: nextBannerUrl,
+          kind: "banner",
+          userId: currentUser.id
+        }).catch(() => nextBannerUrl);
+      }
+
+      setProfileOverrides((current) => ({ ...current, ...resolvedUpdates }));
 
       if (!isRemoteId(currentUser.id)) {
         return;
@@ -1556,17 +1698,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       await updateProfile(
         currentUser.id,
         {
-          username: updates.username,
-          display_name: updates.displayName,
-          bio: updates.bio,
-          avatar_url: updates.avatarUrl,
-          banner_url: updates.bannerUrl,
-          profile_line: updates.location ?? updates.profileLine
+          username: resolvedUpdates.username,
+          display_name: resolvedUpdates.displayName,
+          bio: resolvedUpdates.bio,
+          avatar_url: resolvedUpdates.avatarUrl,
+          banner_url: resolvedUpdates.bannerUrl,
+          accent_color: resolvedUpdates.accentColor,
+          is_private: resolvedUpdates.isPrivate,
+          allow_explore: resolvedUpdates.allowExplore,
+          profile_line: resolvedUpdates.location ?? resolvedUpdates.profileLine
         },
         authSession?.access_token
       ).catch(() => undefined);
     },
-    [authSession?.access_token, currentUser.id]
+    [authSession?.access_token, currentUser.id, currentUser.username]
   );
 
   const saveSticker = useCallback((dataUrl: string) => {
@@ -1675,9 +1820,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      deactivateAccount,
       addLocalPost,
       editPost,
       createInstant,
+      deleteInstant,
       deletePost,
       hidePost,
       pinPost,
@@ -1725,6 +1872,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       currentUser,
       dataset.source,
       createInstant,
+      deactivateAccount,
+      deleteInstant,
       deletePost,
       editPost,
       editorAdjustments,

@@ -5,6 +5,7 @@ import {
   Ban,
   Copy,
   Edit3,
+  Eye,
   EyeOff,
   Flag,
   ImagePlus,
@@ -204,7 +205,7 @@ export function PostCard({
   function handleHidePost() {
     hidePost(post.id);
     setMoreOpen(false);
-    showMenuToast("post hidden");
+    showMenuToast(post.isHidden ? "post unhidden" : "post hidden");
   }
 
   function openDeleteConfirm() {
@@ -391,8 +392,8 @@ export function PostCard({
                 <span>{post.isPinned ? "Unpin post" : "Pin post"}</span>
               </button>
               <button type="button" onClick={handleHidePost}>
-                <EyeOff size={17} />
-                <span>Hide</span>
+                {post.isHidden ? <Eye size={17} /> : <EyeOff size={17} />}
+                <span>{post.isHidden ? "Unhide" : "Hide"}</span>
               </button>
               <button type="button" className="danger-menu-item" onClick={openDeleteConfirm}>
                 <Trash2 size={17} />

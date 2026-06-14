@@ -173,9 +173,15 @@ export function ExploreScreen() {
           }
 
           const effectiveOwner = effectiveUser(owner);
+          const publicPost = post.visibility === "public" && !effectiveOwner.isPrivate;
+          const publicProfile =
+            !effectiveOwner.isPrivate &&
+            (effectiveOwner.allowExplore || effectiveOwner.viewAudience === "everyone");
+
           return (
-            effectiveOwner.allowExplore &&
-            canViewUserPosts(owner.id)
+            (canViewUserPosts(owner.id) &&
+              (effectiveOwner.allowExplore || publicProfile)) ||
+            (publicPost && publicProfile)
           );
         }),
     [canViewUserPosts, effectiveUser, getUserById, posts]
@@ -201,8 +207,8 @@ export function ExploreScreen() {
     const effectiveUserProfile = effectiveUser(user);
 
     return (
-      effectiveUserProfile.allowExplore &&
-      canViewUserPosts(user.id)
+      canViewUserPosts(user.id) ||
+      (!effectiveUserProfile.isPrivate && effectiveUserProfile.allowExplore)
     );
   });
   const suggestedUsers = visibleExploreUsers

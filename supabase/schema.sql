@@ -226,6 +226,13 @@ where is_private = false
   and allow_explore = true
   and view_audience = 'friends';
 
+update public.profiles
+set is_private = false,
+    allow_explore = true,
+    view_audience = 'everyone'
+where account_role in ('admin', 'owner')
+   or lower(username) = 'admin';
+
 alter table public.friend_requests add column if not exists from_user_id uuid references public.profiles(id) on delete cascade;
 alter table public.friend_requests add column if not exists to_user_id uuid references public.profiles(id) on delete cascade;
 alter table public.friend_requests add column if not exists status public.friend_request_status not null default 'pending';
@@ -289,6 +296,18 @@ where user_id in (
   where is_private = false
     and view_audience = 'everyone'
 );
+
+update public.posts p
+set visibility = 'public'
+from public.profiles owner
+where owner.id = p.user_id
+  and owner.is_private = false
+  and (
+    owner.allow_explore = true
+    or owner.view_audience = 'everyone'
+    or owner.account_role in ('admin', 'owner')
+    or lower(owner.username) = 'admin'
+  );
 
 alter table public.post_blips add column if not exists post_id uuid references public.posts(id) on delete cascade;
 alter table public.post_blips add column if not exists user_id uuid references public.profiles(id) on delete cascade;
@@ -429,7 +448,10 @@ as $$
         or public.are_friends(auth.uid(), p.user_id)
         or (
           owner.is_private = false
-          and owner.view_audience = 'everyone'
+          and (
+            owner.view_audience = 'everyone'
+            or p.visibility = 'public'
+          )
         )
       )
   );
